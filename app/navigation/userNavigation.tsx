@@ -2,9 +2,11 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createMaterialTopTabNavigator } from '@react-navigation/material-top-tabs';
 import { createStackNavigator } from '@react-navigation/stack';
 import React from 'react';
-import { Dimensions, Platform, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Dimensions, Platform, StyleSheet, Text, View } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import { useAuth } from '../context/AuthContext';
+
+// ✅ IMPORTS CORREGIDOS - Importar desde las carpetas correctas
 import BusinessDetails from '../screens/business/bar/BarDetailScreen';
 import BusinessBars from '../screens/business/bar/BarListScreen';
 import CreateBarScreen from '../screens/business/bar/CreateBarScreen';
@@ -13,14 +15,23 @@ import AddEventScreen from '../screens/business/events/AddEventScreen';
 import EditEventScreen from '../screens/business/events/EditEventScreen';
 import AddMenuItemScreen from '../screens/business/menu/AddMenuItemScreen';
 import EditMenuItemScreen from '../screens/business/menu/EditMenuItemScreen';
+
+// User screens
 import BarDetailsScreen from '../screens/user/bars/BarDetailsScreen';
 import BarsListScreen from '../screens/user/bars/BarsListScreen';
 import MenuItemScreen from '../screens/user/bars/MenuItemScreen';
 import EventDetailsScreen from '../screens/user/events/EventDetailsScreen';
 import EventsListScreen from '../screens/user/events/EventsListScreen';
-import { default as EditProfileScreen, default as LoginScreen } from '../screens/user/profile/EditProfileScreen';
-import { default as FavoritesScreen, default as RegisterScreen } from '../screens/user/profile/FavoritesScreen';
-import { default as ProfileScreen, default as WelcomeScreen } from '../screens/user/profile/ProfileScreen';
+
+// Profile screens
+import EditProfileScreen from '../screens/user/profile/EditProfileScreen';
+import FavoritesScreen from '../screens/user/profile/FavoritesScreen';
+import ProfileScreen from '../screens/user/profile/ProfileScreen';
+
+// Auth screens
+import LoginScreen from '../screens/user/auth/LoginScreen';
+import RegisterScreen from '../screens/user/auth/RegisterScreen';
+import WelcomeScreen from '../screens/user/auth/WelcomeScreen';
 
 const { width, height } = Dimensions.get('window');
 const isTablet = width >= 768;
@@ -120,9 +131,21 @@ export type BusinessStackParamList = {
   };
 };
 
+// ✅ PANTALLA DE CARGA AGREGADA
+function LoadingScreen() {
+  return (
+    <View style={styles.loadingContainer}>
+      <ActivityIndicator size="large" color={colors.primary} />
+      <Text style={styles.loadingText}>Cargando...</Text>
+    </View>
+  );
+}
+
 // Auth Stack Navigator
 const AuthStack = createStackNavigator<AuthStackParamList>();
 function AuthNavigator() {
+  console.log('🔓 AuthNavigator: Rendering auth stack');
+  
   return (
     <AuthStack.Navigator
       screenOptions={{
@@ -385,6 +408,8 @@ function MobileTabNavigator() {
 
 // Main Tab Navigator - chooses between mobile and desktop layout
 function MainTabNavigator() {
+  console.log('🔒 MainTabNavigator: Rendering main tabs');
+  
   // Use desktop layout for tablets and larger screens
   if (isTablet || isDesktop) {
     return <DesktopTabNavigator />;
@@ -393,14 +418,44 @@ function MainTabNavigator() {
   return <MobileTabNavigator />;
 }
 
-// Root Navigator - Main entry point
+// ✅ ROOT NAVIGATOR CORREGIDO CON LOGS
 export default function RootNavigator() {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, isLoading } = useAuth();
 
-  return isAuthenticated ? <MainTabNavigator /> : <AuthNavigator />;
+  console.log('🚦 RootNavigator - isAuthenticated:', isAuthenticated);
+  console.log('🚦 RootNavigator - isLoading:', isLoading);
+
+  // Mostrar pantalla de carga mientras se verifica la autenticación
+  if (isLoading) {
+    console.log('🔄 RootNavigator - Showing loading screen');
+    return <LoadingScreen />;
+  }
+
+  // Elegir el navegador apropiado
+  if (isAuthenticated) {
+    console.log('🔒 RootNavigator - User authenticated, showing main app');
+    return <MainTabNavigator />;
+  } else {
+    console.log('🔓 RootNavigator - User not authenticated, showing auth flow');
+    return <AuthNavigator />;
+  }
 }
 
 const styles = StyleSheet.create({
+  // ✅ ESTILOS PARA PANTALLA DE CARGA
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: colors.background,
+  },
+  loadingText: {
+    color: colors.text,
+    fontSize: 16,
+    fontWeight: '500',
+    marginTop: 16,
+  },
+
   // Desktop styles
   desktopContainer: {
     flex: 1,

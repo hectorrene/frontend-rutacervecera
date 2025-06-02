@@ -1,24 +1,23 @@
-import DateTimePicker from '@react-native-community/datetimepicker';
 import { StackNavigationProp } from '@react-navigation/stack';
 import React, { useEffect, useState } from 'react';
 import {
-    ActivityIndicator,
-    Alert,
-    Dimensions,
-    Image,
-    KeyboardAvoidingView,
-    Platform,
-    ScrollView,
-    StatusBar,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View
+  ActivityIndicator,
+  Alert,
+  Dimensions,
+  Image,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  StatusBar,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/MaterialIcons';
-import BarService from '../../../services/BarService';
+import { useAuth } from '../../../context/AuthContext';
 import { ProfileStackParamList } from '../../../types/navigation';
 
 const { width, height } = Dimensions.get('window');
@@ -47,12 +46,13 @@ const colors = {
   inputFocused: '#3b82f6',
 };
 
-interface User {
+interface EditableUser {
   name: string;
-  phone: string;
-  birthDate: string;
+  accountType: 'business' | 'user';
+  currentPassword: string;
+  password: string;
+  confirmPassword: string;
   photo: string;
-  email?: string;
 }
 
 type EditProfileScreenNavigationProp = StackNavigationProp<ProfileStackParamList, 'EditProfile'>;
@@ -62,60 +62,64 @@ interface EditProfileScreenProps {
 }
 
 const EditProfileScreen: React.FC<EditProfileScreenProps> = ({ navigation }) => {
-  const [user, setUser] = useState<User>({
+  const { user, updateProfile, changePassword, isLoading } = useAuth();
+  
+  const [formData, setFormData] = useState<EditableUser>({
     name: '',
-    phone: '',
-    birthDate: new Date().toISOString(),
+    accountType: 'user',
+    currentPassword: '',
+    password: '',
+    confirmPassword: '',
     photo: '',
-    email: '',
   });
 
-  const [showDatePicker, setShowDatePicker] = useState(false);
-  const [loading, setLoading] = useState(true);
+  const [showCurrentPassword, setShowCurrentPassword] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [saving, setSaving] = useState(false);
   const [errors, setErrors] = useState<{[key: string]: string}>({});
   const [focusedField, setFocusedField] = useState<string | null>(null);
 
   useEffect(() => {
-    const fetchUser = async () => {
-      try {
-        setLoading(true);
-        const response = await BarService.getMyProfile();
-        setUser(response.data);
-      } catch (error) {
-        console.error('Error loading user data:', error);
-        Alert.alert('Error', 'Failed to load user data');
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchUser();
-  }, []);
+    if (user) {
+      setFormData({
+        name: user.name || '',
+        accountType: user.accountType || 'user',
+        currentPassword: '',
+        password: '',
+        confirmPassword: '',
+        photo: user.photo || '',
+      });
+    }
+  }, [user]);
 
   const validateForm = (): boolean => {
     const newErrors: {[key: string]: string} = {};
 
-    if (!user.name.trim()) {
+    // Validar nombre
+    if (!formData.name.trim()) {
       newErrors.name = 'El nombre es requerido';
-    } else if (user.name.trim().length < 2) {
+    } else if (formData.name.trim().length < 2) {
       newErrors.name = 'El nombre debe tener al menos 2 caracteres';
     }
 
-    if (!user.phone.trim()) {
-      newErrors.phone = 'El teléfono es requerido';
-    } else if (!/^\+?[\d\s\-$$$$]+$/.test(user.phone)) {
-      newErrors.phone = 'Formato de teléfono inválido';
-    }
+    // Validar contraseña (solo si se está intentando cambiar)
+    if (formData.password || formData.confirmPassword || formData.currentPassword) {
+      if (!formData.currentPassword) {
+        newErrors.currentPassword = 'La contraseña actual es requerida para cambiar la contraseña';
+      }
 
-    const birthDate = new Date(user.birthDate);
-    const today = new Date();
-    const age = today.getFullYear() - birthDate.getFullYear();
-    
-    if (age < 13) {
-      newErrors.birthDate = 'Debes tener al menos 13 años';
-    } else if (age > 120) {
-      newErrors.birthDate = 'Fecha de nacimiento inválida';
+      if (!formData.password) {
+        newErrors.password = 'La nueva contraseña es requerida';
+      } else if (formData.password.length < 6) {
+        newErrors.password = 'La contraseña debe tener al menos 6 caracteres';
+      }
+
+      if (!formData.confirmPassword) {
+        newErrors.confirmPassword = 'Confirmar contraseña es requerido';
+      } else if (formData.password !== formData.confirmPassword) {
+        newErrors.confirmPassword = 'Las contraseñas no coinciden';
+      }
     }
 
     setErrors(newErrors);
@@ -130,7 +134,37 @@ const EditProfileScreen: React.FC<EditProfileScreenProps> = ({ navigation }) => 
 
     try {
       setSaving(true);
-      await BarService.updateProfile(user);
+
+      // Actualizar perfil básico
+      const profileData = {
+        name: formData.name,
+        accountType: formData.accountType,
+        photo: formData.photo,
+      };
+
+      const updateResponse = await updateProfile(profileData);
+      
+      if (!updateResponse.success) {
+        Alert.alert('Error', updateResponse.message || 'No se pudo actualizar el perfil');
+        return;
+      }
+
+      // Cambiar contraseña si se proporcionó
+      if (formData.password && formData.currentPassword) {
+        const passwordData = {
+          currentPassword: formData.currentPassword,
+          newPassword: formData.password,
+          confirmPassword: formData.confirmPassword,
+        };
+
+        const passwordResponse = await changePassword(passwordData);
+        
+        if (!passwordResponse.success) {
+          Alert.alert('Error', passwordResponse.message || 'No se pudo cambiar la contraseña');
+          return;
+        }
+      }
+
       Alert.alert(
         'Éxito', 
         'Perfil actualizado correctamente',
@@ -149,31 +183,8 @@ const EditProfileScreen: React.FC<EditProfileScreenProps> = ({ navigation }) => 
     }
   };
 
-  const handleDateChange = (event: any, selectedDate?: Date) => {
-    setShowDatePicker(false);
-    if (selectedDate) {
-      setUser(prev => ({
-        ...prev,
-        birthDate: selectedDate.toISOString(),
-      }));
-      // Clear date error if exists
-      if (errors.birthDate) {
-        setErrors(prev => ({ ...prev, birthDate: '' }));
-      }
-    }
-  };
-
-  const formatDate = (dateString: string): string => {
-    const date = new Date(dateString);
-    return date.toLocaleDateString('es-ES', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
-    });
-  };
-
-  const handleInputChange = (field: string, value: string) => {
-    setUser(prev => ({ ...prev, [field]: value }));
+  const handleInputChange = (field: keyof EditableUser, value: string) => {
+    setFormData(prev => ({ ...prev, [field]: value }));
     // Clear error when user starts typing
     if (errors[field]) {
       setErrors(prev => ({ ...prev, [field]: '' }));
@@ -188,11 +199,27 @@ const EditProfileScreen: React.FC<EditProfileScreenProps> = ({ navigation }) => 
         { text: 'Cancelar', style: 'cancel' },
         { text: 'Cámara', onPress: () => console.log('Open camera') },
         { text: 'Galería', onPress: () => console.log('Open gallery') },
+        { 
+          text: 'URL personalizada', 
+          onPress: () => {
+            Alert.prompt(
+              'URL de imagen',
+              'Ingresa la URL de tu foto:',
+              (text) => {
+                if (text) {
+                  handleInputChange('photo', text);
+                }
+              },
+              'plain-text',
+              formData.photo
+            );
+          }
+        },
       ]
     );
   };
 
-  if (loading) {
+  if (isLoading) {
     return (
       <SafeAreaView style={styles.loadingContainer}>
         <StatusBar barStyle="light-content" backgroundColor={colors.background} />
@@ -247,7 +274,7 @@ const EditProfileScreen: React.FC<EditProfileScreenProps> = ({ navigation }) => 
             >
               <Image
                 source={{
-                  uri: user.photo || 'https://www.gravatar.com/avatar/?d=mp&s=150',
+                  uri: formData.photo || 'https://www.gravatar.com/avatar/?d=mp&s=150',
                 }}
                 style={styles.profilePhoto}
               />
@@ -260,87 +287,215 @@ const EditProfileScreen: React.FC<EditProfileScreenProps> = ({ navigation }) => 
 
           {/* Form Fields */}
           <View style={styles.formContainer}>
-            {/* Name Field */}
-            <View style={styles.fieldContainer}>
-              <Text style={styles.fieldLabel}>Nombre completo</Text>
-              <View style={[
-                styles.inputContainer,
-                focusedField === 'name' && styles.inputContainerFocused,
-                errors.name && styles.inputContainerError
-              ]}>
-                <Icon name="person" size={20} color={colors.textMuted} style={styles.inputIcon} />
-                <TextInput
-                  style={styles.textInput}
-                  value={user.name}
-                  onChangeText={(text) => handleInputChange('name', text)}
-                  placeholder="Ingresa tu nombre completo"
-                  placeholderTextColor={colors.textMuted}
-                  onFocus={() => setFocusedField('name')}
-                  onBlur={() => setFocusedField(null)}
-                />
-              </View>
-              {errors.name && <Text style={styles.errorText}>{errors.name}</Text>}
-            </View>
-
-            {/* Email Field (Read-only) */}
-            {user.email && (
+            {/* Read-only fields */}
+            <View style={styles.readOnlySection}>
+              <Text style={styles.sectionTitle}>Información de cuenta</Text>
+              
+              {/* Email Field (Read-only) */}
               <View style={styles.fieldContainer}>
                 <Text style={styles.fieldLabel}>Correo electrónico</Text>
                 <View style={[styles.inputContainer, styles.inputContainerDisabled]}>
                   <Icon name="email" size={20} color={colors.textMuted} style={styles.inputIcon} />
-                  <TextInput
-                    style={[styles.textInput, styles.textInputDisabled]}
-                    value={user.email}
-                    editable={false}
-                    placeholder="Correo electrónico"
-                    placeholderTextColor={colors.textMuted}
-                  />
+                  <Text style={styles.readOnlyText}>{user?.email}</Text>
                   <Icon name="lock" size={16} color={colors.textMuted} />
                 </View>
                 <Text style={styles.fieldHint}>El correo electrónico no se puede modificar</Text>
               </View>
-            )}
 
-            {/* Phone Field */}
-            <View style={styles.fieldContainer}>
-              <Text style={styles.fieldLabel}>Teléfono</Text>
-              <View style={[
-                styles.inputContainer,
-                focusedField === 'phone' && styles.inputContainerFocused,
-                errors.phone && styles.inputContainerError
-              ]}>
-                <Icon name="phone" size={20} color={colors.textMuted} style={styles.inputIcon} />
-                <TextInput
-                  style={styles.textInput}
-                  value={user.phone}
-                  onChangeText={(text) => handleInputChange('phone', text)}
-                  placeholder="Ingresa tu número de teléfono"
-                  placeholderTextColor={colors.textMuted}
-                  keyboardType="phone-pad"
-                  onFocus={() => setFocusedField('phone')}
-                  onBlur={() => setFocusedField(null)}
-                />
+              {/* Phone Field (Read-only) */}
+              <View style={styles.fieldContainer}>
+                <Text style={styles.fieldLabel}>Teléfono</Text>
+                <View style={[styles.inputContainer, styles.inputContainerDisabled]}>
+                  <Icon name="phone" size={20} color={colors.textMuted} style={styles.inputIcon} />
+                  <Text style={styles.readOnlyText}>{user?.phone}</Text>
+                  <Icon name="lock" size={16} color={colors.textMuted} />
+                </View>
+                <Text style={styles.fieldHint}>El teléfono no se puede modificar</Text>
               </View>
-              {errors.phone && <Text style={styles.errorText}>{errors.phone}</Text>}
-            </View>
 
-            {/* Birth Date Field */}
-            <View style={styles.fieldContainer}>
-              <Text style={styles.fieldLabel}>Fecha de nacimiento</Text>
-              <TouchableOpacity
-                style={[
+              {/* Birth Date Field (Read-only) */}
+              <View style={styles.fieldContainer}>
+                <Text style={styles.fieldLabel}>Fecha de nacimiento</Text>
+                <View style={[styles.inputContainer, styles.inputContainerDisabled]}>
+                  <Icon name="cake" size={20} color={colors.textMuted} style={styles.inputIcon} />
+                  <Text style={styles.readOnlyText}>
+                    {user?.birthDate ? new Date(user.birthDate).toLocaleDateString('es-ES', {
+                      year: 'numeric',
+                      month: 'long',
+                      day: 'numeric',
+                    }) : 'No especificada'}
+                  </Text>
+                  <Icon name="lock" size={16} color={colors.textMuted} />
+                </View>
+                <Text style={styles.fieldHint}>La fecha de nacimiento no se puede modificar</Text>
+              </View>
+          </View>
+
+            {/* Editable fields */}
+            <View style={styles.editableSection}>
+              <Text style={styles.sectionTitle}>Información editable</Text>
+
+              {/* Name Field */}
+              <View style={styles.fieldContainer}>
+                <Text style={styles.fieldLabel}>Nombre completo</Text>
+                <View style={[
                   styles.inputContainer,
-                  errors.birthDate && styles.inputContainerError
-                ]}
-                onPress={() => setShowDatePicker(true)}
-              >
-                <Icon name="cake" size={20} color={colors.textMuted} style={styles.inputIcon} />
-                <Text style={styles.dateText}>
-                  {formatDate(user.birthDate)}
-                </Text>
-                <Icon name="keyboard-arrow-down" size={20} color={colors.textMuted} />
-              </TouchableOpacity>
-              {errors.birthDate && <Text style={styles.errorText}>{errors.birthDate}</Text>}
+                  focusedField === 'name' && styles.inputContainerFocused,
+                  errors.name && styles.inputContainerError
+                ]}>
+                  <Icon name="person" size={20} color={colors.textMuted} style={styles.inputIcon} />
+                  <TextInput
+                    style={styles.textInput}
+                    value={formData.name}
+                    onChangeText={(text) => handleInputChange('name', text)}
+                    placeholder="Ingresa tu nombre completo"
+                    placeholderTextColor={colors.textMuted}
+                    onFocus={() => setFocusedField('name')}
+                    onBlur={() => setFocusedField(null)}
+                  />
+                </View>
+                {errors.name && <Text style={styles.errorText}>{errors.name}</Text>}
+              </View>
+
+              {/* Account Type Field */}
+              <View style={styles.fieldContainer}>
+                <Text style={styles.fieldLabel}>Tipo de cuenta</Text>
+                <View style={styles.accountTypeContainer}>
+                  <TouchableOpacity
+                    style={[
+                      styles.accountTypeOption,
+                      formData.accountType === 'user' && styles.accountTypeOptionSelected
+                    ]}
+                    onPress={() => handleInputChange('accountType', 'user')}
+                  >
+                    <Icon 
+                      name="person" 
+                      size={20} 
+                      color={formData.accountType === 'user' ? colors.text : colors.textMuted} 
+                    />
+                    <Text style={[
+                      styles.accountTypeText,
+                      formData.accountType === 'user' && styles.accountTypeTextSelected
+                    ]}>
+                      Usuario
+                    </Text>
+                  </TouchableOpacity>
+                  
+                  <TouchableOpacity
+                    style={[
+                      styles.accountTypeOption,
+                      formData.accountType === 'business' && styles.accountTypeOptionSelected
+                    ]}
+                    onPress={() => handleInputChange('accountType', 'business')}
+                  >
+                    <Icon 
+                      name="business" 
+                      size={20} 
+                      color={formData.accountType === 'business' ? colors.text : colors.textMuted} 
+                    />
+                    <Text style={[
+                      styles.accountTypeText,
+                      formData.accountType === 'business' && styles.accountTypeTextSelected
+                    ]}>
+                      Negocio
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+
+              {/* Password Change Section */}
+              <Text style={styles.sectionTitle}>Cambiar contraseña</Text>
+              <Text style={styles.fieldHint}>Completa todos los campos para cambiar tu contraseña</Text>
+
+              {/* Current Password Field */}
+              <View style={styles.fieldContainer}>
+                <Text style={styles.fieldLabel}>Contraseña actual</Text>
+                <View style={[
+                  styles.inputContainer,
+                  focusedField === 'currentPassword' && styles.inputContainerFocused,
+                  errors.currentPassword && styles.inputContainerError
+                ]}>
+                  <Icon name="lock-outline" size={20} color={colors.textMuted} style={styles.inputIcon} />
+                  <TextInput
+                    style={styles.textInput}
+                    value={formData.currentPassword}
+                    onChangeText={(text) => handleInputChange('currentPassword', text)}
+                    placeholder="Ingresa tu contraseña actual"
+                    placeholderTextColor={colors.textMuted}
+                    secureTextEntry={!showCurrentPassword}
+                    onFocus={() => setFocusedField('currentPassword')}
+                    onBlur={() => setFocusedField(null)}
+                  />
+                  <TouchableOpacity onPress={() => setShowCurrentPassword(!showCurrentPassword)}>
+                    <Icon 
+                      name={showCurrentPassword ? "visibility-off" : "visibility"} 
+                      size={20} 
+                      color={colors.textMuted} 
+                    />
+                  </TouchableOpacity>
+                </View>
+                {errors.currentPassword && <Text style={styles.errorText}>{errors.currentPassword}</Text>}
+              </View>
+
+              {/* New Password Field */}
+              <View style={styles.fieldContainer}>
+                <Text style={styles.fieldLabel}>Nueva contraseña</Text>
+                <View style={[
+                  styles.inputContainer,
+                  focusedField === 'password' && styles.inputContainerFocused,
+                  errors.password && styles.inputContainerError
+                ]}>
+                  <Icon name="lock" size={20} color={colors.textMuted} style={styles.inputIcon} />
+                  <TextInput
+                    style={styles.textInput}
+                    value={formData.password}
+                    onChangeText={(text) => handleInputChange('password', text)}
+                    placeholder="Ingresa nueva contraseña"
+                    placeholderTextColor={colors.textMuted}
+                    secureTextEntry={!showPassword}
+                    onFocus={() => setFocusedField('password')}
+                    onBlur={() => setFocusedField(null)}
+                  />
+                  <TouchableOpacity onPress={() => setShowPassword(!showPassword)}>
+                    <Icon 
+                      name={showPassword ? "visibility-off" : "visibility"} 
+                      size={20} 
+                      color={colors.textMuted} 
+                    />
+                  </TouchableOpacity>
+                </View>
+                {errors.password && <Text style={styles.errorText}>{errors.password}</Text>}
+              </View>
+
+              {/* Confirm Password Field */}
+              <View style={styles.fieldContainer}>
+                <Text style={styles.fieldLabel}>Confirmar nueva contraseña</Text>
+                <View style={[
+                  styles.inputContainer,
+                  focusedField === 'confirmPassword' && styles.inputContainerFocused,
+                  errors.confirmPassword && styles.inputContainerError
+                ]}>
+                  <Icon name="lock" size={20} color={colors.textMuted} style={styles.inputIcon} />
+                  <TextInput
+                    style={styles.textInput}
+                    value={formData.confirmPassword}
+                    onChangeText={(text) => handleInputChange('confirmPassword', text)}
+                    placeholder="Confirma tu nueva contraseña"
+                    placeholderTextColor={colors.textMuted}
+                    secureTextEntry={!showConfirmPassword}
+                    onFocus={() => setFocusedField('confirmPassword')}
+                    onBlur={() => setFocusedField(null)}
+                  />
+                  <TouchableOpacity onPress={() => setShowConfirmPassword(!showConfirmPassword)}>
+                    <Icon 
+                      name={showConfirmPassword ? "visibility-off" : "visibility"} 
+                      size={20} 
+                      color={colors.textMuted} 
+                    />
+                  </TouchableOpacity>
+                </View>
+                {errors.confirmPassword && <Text style={styles.errorText}>{errors.confirmPassword}</Text>}
+              </View>
             </View>
           </View>
 
@@ -370,18 +525,6 @@ const EditProfileScreen: React.FC<EditProfileScreenProps> = ({ navigation }) => 
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
-
-      {/* Date Picker */}
-      {showDatePicker && (
-        <DateTimePicker
-          value={new Date(user.birthDate)}
-          mode="date"
-          display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-          onChange={handleDateChange}
-          maximumDate={new Date()}
-          minimumDate={new Date(1900, 0, 1)}
-        />
-      )}
     </SafeAreaView>
   );
 };
@@ -476,6 +619,21 @@ const styles = StyleSheet.create({
   formContainer: {
     padding: 20,
   },
+  readOnlySection: {
+    marginBottom: 32,
+  },
+  editableSection: {
+    marginBottom: 20,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: colors.text,
+    marginBottom: 20,
+    paddingBottom: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
   fieldContainer: {
     marginBottom: 24,
   },
@@ -515,13 +673,40 @@ const styles = StyleSheet.create({
     color: colors.text,
     paddingVertical: 0,
   },
-  textInputDisabled: {
-    color: colors.textMuted,
-  },
-  dateText: {
+  readOnlyText: {
     flex: 1,
     fontSize: 16,
+    color: colors.textMuted,
+  },
+  accountTypeContainer: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  accountTypeOption: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.surfaceVariant,
+    borderRadius: 12,
+    paddingVertical: 16,
+    paddingHorizontal: 12,
+    borderWidth: 1,
+    borderColor: colors.border,
+    gap: 8,
+  },
+  accountTypeOptionSelected: {
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
+  },
+  accountTypeText: {
+    fontSize: 16,
+    color: colors.textMuted,
+    fontWeight: '500',
+  },
+  accountTypeTextSelected: {
     color: colors.text,
+    fontWeight: '600',
   },
   errorText: {
     fontSize: 14,

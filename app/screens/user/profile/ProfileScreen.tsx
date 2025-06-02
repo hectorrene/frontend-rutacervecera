@@ -49,7 +49,8 @@ interface ProfileScreenProps {
 }
 
 const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
-  const { user, logout, refreshProfile } = useAuth();
+  const { user, logout } = useAuth();
+    //const { user, logout, refreshProfile } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -57,7 +58,7 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
     console.log('[ProfileScreen] useEffect - user:', user);
     if (user) {
       console.log('[ProfileScreen] Calling refreshProfile');
-      refreshProfile();
+      //refreshProfile();
     }
   }, []);
 
@@ -68,7 +69,7 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
   const onRefresh = async () => {
     setRefreshing(true);
     try {
-      await refreshProfile();
+      //await //refreshProfile();
     } catch (error) {
       console.error('Error refreshing profile:', error);
     } finally {

@@ -2,7 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios, { AxiosResponse } from 'axios';
 import { Platform } from 'react-native';
 import { HandleLoginError } from "../../helpers/ErrorHandler";
-import AuthService from './AuthService';
+import { getCurrentUserGlobal } from '../context/AuthContext'; // Importar la función global
 
 const API_BASE_URL = Platform.select({
   ios: 'http://192.168.100.191:3000/api',
@@ -31,7 +31,10 @@ class BusinessService {
   // Crear un nuevo bar (solo para cuentas business)
   async createBar(barData: any): Promise<AxiosResponse> {
     try {
-      return await this.api.post('/business/bars', barData);
+      const userId = getCurrentUserGlobal()?._id;
+      if (!userId) throw new Error('User not authenticated');
+      
+      return await this.api.post(`/bars/owner/${userId}`, barData);
     } catch (error) {
       HandleLoginError(error);
       throw error;
@@ -41,10 +44,23 @@ class BusinessService {
   // Obtener todos los bares del usuario business
   async getMyBars(): Promise<AxiosResponse> {
     try {
-      const userId = AuthService.getCurrentUser()?._id;
+      const userId = getCurrentUserGlobal()?._id;
       if (!userId) throw new Error('User not authenticated');
       
-      return await this.api.get(`/business/${userId}/bars`);
+      return await this.api.get(`/bars/owner/${userId}`);
+    } catch (error) {
+      HandleLoginError(error);
+      throw error;
+    }
+  }
+
+  // Obtener un bar específico del usuario
+  async getMyBar(barId: string): Promise<AxiosResponse> {
+    try {
+      const userId = getCurrentUserGlobal()?._id;
+      if (!userId) throw new Error('User not authenticated');
+      
+      return await this.api.get(`/bars/owner/${userId}/${barId}`);
     } catch (error) {
       HandleLoginError(error);
       throw error;
@@ -54,10 +70,10 @@ class BusinessService {
   // Actualizar un bar específico
   async updateBar(barId: string, barData: any): Promise<AxiosResponse> {
     try {
-      const userId = AuthService.getCurrentUser()?._id;
+      const userId = getCurrentUserGlobal()?._id;
       if (!userId) throw new Error('User not authenticated');
       
-      return await this.api.put(`/business/${userId}/bars/${barId}`, barData);
+      return await this.api.put(`/bars/owner/${userId}/${barId}`, barData);
     } catch (error) {
       HandleLoginError(error);
       throw error;
@@ -67,10 +83,10 @@ class BusinessService {
   // Eliminar un bar
   async deleteBar(barId: string): Promise<AxiosResponse> {
     try {
-      const userId = AuthService.getCurrentUser()?._id;
+      const userId = getCurrentUserGlobal()?._id;
       if (!userId) throw new Error('User not authenticated');
       
-      return await this.api.delete(`/business/${userId}/bars/${barId}`);
+      return await this.api.delete(`/bars/owner/${userId}/${barId}`);
     } catch (error) {
       HandleLoginError(error);
       throw error;
@@ -80,10 +96,10 @@ class BusinessService {
   // Obtener el menú de un bar específico del usuario
   async getMyBarMenu(barId: string): Promise<AxiosResponse> {
     try {
-      const userId = AuthService.getCurrentUser()?._id;
+      const userId = getCurrentUserGlobal()?._id;
       if (!userId) throw new Error('User not authenticated');
       
-      return await this.api.get(`/business/${userId}/bars/${barId}/menu`);
+      return await this.api.get(`/bars/owner/${userId}/${barId}/menu`);
     } catch (error) {
       HandleLoginError(error);
       throw error;
@@ -93,10 +109,10 @@ class BusinessService {
   // Agregar item al menú
   async addMenuItem(barId: string, menuItem: any): Promise<AxiosResponse> {
     try {
-      const userId = AuthService.getCurrentUser()?._id;
+      const userId = getCurrentUserGlobal()?._id;
       if (!userId) throw new Error('User not authenticated');
       
-      return await this.api.post(`/business/${userId}/bars/${barId}/menu`, menuItem);
+      return await this.api.post(`/bars/owner/${userId}/${barId}/menu`, menuItem);
     } catch (error) {
       HandleLoginError(error);
       throw error;
@@ -106,10 +122,10 @@ class BusinessService {
   // Actualizar item del menú
   async updateMenuItem(barId: string, itemId: string, menuItem: any): Promise<AxiosResponse> {
     try {
-      const userId = AuthService.getCurrentUser()?._id;
+      const userId = getCurrentUserGlobal()?._id;
       if (!userId) throw new Error('User not authenticated');
       
-      return await this.api.put(`/business/${userId}/bars/${barId}/menu/${itemId}`, menuItem);
+      return await this.api.put(`/bars/owner/${userId}/${barId}/menu/${itemId}`, menuItem);
     } catch (error) {
       HandleLoginError(error);
       throw error;
@@ -119,10 +135,10 @@ class BusinessService {
   // Eliminar item del menú
   async deleteMenuItem(barId: string, itemId: string): Promise<AxiosResponse> {
     try {
-      const userId = AuthService.getCurrentUser()?._id;
+      const userId = getCurrentUserGlobal()?._id;
       if (!userId) throw new Error('User not authenticated');
       
-      return await this.api.delete(`/business/${userId}/bars/${barId}/menu/${itemId}`);
+      return await this.api.delete(`/bars/owner/${userId}/${barId}/menu/${itemId}`);
     } catch (error) {
       HandleLoginError(error);
       throw error;
@@ -132,10 +148,10 @@ class BusinessService {
   // Crear un evento
   async createEvent(barId: string, eventData: any): Promise<AxiosResponse> {
     try {
-      const userId = AuthService.getCurrentUser()?._id;
+      const userId = getCurrentUserGlobal()?._id;
       if (!userId) throw new Error('User not authenticated');
       
-      return await this.api.post(`/business/${userId}/bars/${barId}/events`, eventData);
+      return await this.api.post(`/bars/owner/${userId}/${barId}/events`, eventData);
     } catch (error) {
       HandleLoginError(error);
       throw error;
@@ -145,10 +161,10 @@ class BusinessService {
   // Obtener eventos de un bar específico del usuario
   async getMyBarEvents(barId: string): Promise<AxiosResponse> {
     try {
-      const userId = AuthService.getCurrentUser()?._id;
+      const userId = getCurrentUserGlobal()?._id;
       if (!userId) throw new Error('User not authenticated');
       
-      return await this.api.get(`/business/${userId}/bars/${barId}/events`);
+      return await this.api.get(`/bars/owner/${userId}/${barId}/events`);
     } catch (error) {
       HandleLoginError(error);
       throw error;
@@ -158,10 +174,10 @@ class BusinessService {
   // Actualizar un evento
   async updateEvent(barId: string, eventId: string, eventData: any): Promise<AxiosResponse> {
     try {
-      const userId = AuthService.getCurrentUser()?._id;
+      const userId = getCurrentUserGlobal()?._id;
       if (!userId) throw new Error('User not authenticated');
       
-      return await this.api.put(`/business/${userId}/bars/${barId}/events/${eventId}`, eventData);
+      return await this.api.put(`/bars/owner/${userId}/${barId}/events/${eventId}`, eventData);
     } catch (error) {
       HandleLoginError(error);
       throw error;
@@ -171,10 +187,10 @@ class BusinessService {
   // Eliminar un evento
   async deleteEvent(barId: string, eventId: string): Promise<AxiosResponse> {
     try {
-      const userId = AuthService.getCurrentUser()?._id;
+      const userId = getCurrentUserGlobal()?._id;
       if (!userId) throw new Error('User not authenticated');
       
-      return await this.api.delete(`/business/${userId}/bars/${barId}/events/${eventId}`);
+      return await this.api.delete(`/bars/owner/${userId}/${barId}/events/${eventId}`);
     } catch (error) {
       HandleLoginError(error);
       throw error;
@@ -184,23 +200,32 @@ class BusinessService {
   // Obtener reviews de un bar específico del usuario
   async getMyBarReviews(barId: string): Promise<AxiosResponse> {
     try {
-      const userId = AuthService.getCurrentUser()?._id;
+      const userId = getCurrentUserGlobal()?._id;
       if (!userId) throw new Error('User not authenticated');
       
-      return await this.api.get(`/business/${userId}/bars/${barId}/reviews`);
+      return await this.api.get(`/bars/owner/${userId}/${barId}/reviews`);
     } catch (error) {
       HandleLoginError(error);
       throw error;
     }
   }
 
-  // Responder a un review
+  // Verificar si el usuario actual es business
+  isBusinessAccount(): boolean {
+    const user = getCurrentUserGlobal();
+    return user?.accountType === 'business';
+  }
+
+  // NOTA: Los siguientes métodos no tienen endpoints correspondientes en tu backend
+  // Puedes implementarlos más tarde o eliminarlos si no los necesitas
+
+  // Responder a un review (ENDPOINT NO IMPLEMENTADO EN BACKEND)
   async respondToReview(barId: string, reviewId: string, response: string): Promise<AxiosResponse> {
     try {
-      const userId = AuthService.getCurrentUser()?._id;
+      const userId = getCurrentUserGlobal()?._id;
       if (!userId) throw new Error('User not authenticated');
       
-      return await this.api.post(`/business/${userId}/bars/${barId}/reviews/${reviewId}/respond`, {
+      return await this.api.post(`/bars/owner/${userId}/${barId}/reviews/${reviewId}/respond`, {
         response
       });
     } catch (error) {
@@ -209,10 +234,10 @@ class BusinessService {
     }
   }
 
-  // Obtener estadísticas del negocio
+  // Obtener estadísticas del negocio (ENDPOINT NO IMPLEMENTADO EN BACKEND)
   async getBusinessStats(): Promise<AxiosResponse> {
     try {
-      const userId = AuthService.getCurrentUser()?._id;
+      const userId = getCurrentUserGlobal()?._id;
       if (!userId) throw new Error('User not authenticated');
       
       return await this.api.get(`/business/${userId}/stats`);
@@ -222,32 +247,26 @@ class BusinessService {
     }
   }
 
-  // Obtener estadísticas de un bar específico
+  // Obtener estadísticas de un bar específico (ENDPOINT NO IMPLEMENTADO EN BACKEND)
   async getBarStats(barId: string): Promise<AxiosResponse> {
     try {
-      const userId = AuthService.getCurrentUser()?._id;
+      const userId = getCurrentUserGlobal()?._id;
       if (!userId) throw new Error('User not authenticated');
       
-      return await this.api.get(`/business/${userId}/bars/${barId}/stats`);
+      return await this.api.get(`/bars/owner/${userId}/${barId}/stats`);
     } catch (error) {
       HandleLoginError(error);
       throw error;
     }
   }
 
-  // Verificar si el usuario actual es business
-  isBusinessAccount(): boolean {
-    const user = AuthService.getCurrentUser();
-    return user?.accountType === 'business';
-  }
-
-  // Subir imagen para el bar
+  // Subir imagen para el bar (ENDPOINT NO IMPLEMENTADO EN BACKEND)
   async uploadBarImage(barId: string, imageData: FormData): Promise<AxiosResponse> {
     try {
-      const userId = AuthService.getCurrentUser()?._id;
+      const userId = getCurrentUserGlobal()?._id;
       if (!userId) throw new Error('User not authenticated');
       
-      return await this.api.post(`/business/${userId}/bars/${barId}/upload-image`, imageData, {
+      return await this.api.post(`/bars/owner/${userId}/${barId}/upload-image`, imageData, {
         headers: {
           'Content-Type': 'multipart/form-data',
         },
@@ -258,13 +277,13 @@ class BusinessService {
     }
   }
 
-  // Subir imagen para item del menú
+  // Subir imagen para item del menú (ENDPOINT NO IMPLEMENTADO EN BACKEND)
   async uploadMenuItemImage(barId: string, itemId: string, imageData: FormData): Promise<AxiosResponse> {
     try {
-      const userId = AuthService.getCurrentUser()?._id;
+      const userId = getCurrentUserGlobal()?._id;
       if (!userId) throw new Error('User not authenticated');
       
-      return await this.api.post(`/business/${userId}/bars/${barId}/menu/${itemId}/upload-image`, imageData, {
+      return await this.api.post(`/bars/owner/${userId}/${barId}/menu/${itemId}/upload-image`, imageData, {
         headers: {
           'Content-Type': 'multipart/form-data',
         },

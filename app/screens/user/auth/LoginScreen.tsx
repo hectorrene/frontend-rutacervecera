@@ -276,14 +276,6 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ navigation }) => {
                     {errors.password && <Text style={styles.errorText}>{errors.password}</Text>}
                   </View>
 
-                  {/* Forgot Password */}
-                  <TouchableOpacity 
-                    style={styles.forgotPassword}
-                    onPress={handleForgotPassword}
-                  >
-                    <Text style={styles.forgotPasswordText}>¿Olvidaste tu contraseña?</Text>
-                  </TouchableOpacity>
-
                   {/* Login Button */}
                   <TouchableOpacity
                     style={[styles.loginButton, isLoading && styles.buttonDisabled]}
@@ -307,37 +299,6 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ navigation }) => {
                       )}
                     </LinearGradient>
                   </TouchableOpacity>
-
-                  {/* Divider */}
-                  <View style={styles.divider}>
-                    <View style={styles.dividerLine} />
-                    <Text style={styles.dividerText}>o continúa con</Text>
-                    <View style={styles.dividerLine} />
-                  </View>
-
-                  {/* Social Login */}
-                  <View style={styles.socialContainer}>
-                    <TouchableOpacity 
-                      style={styles.socialButton}
-                      onPress={() => handleSocialLogin('Google')}
-                    >
-                      <Icon name="g-translate" size={24} color={colors.text} />
-                    </TouchableOpacity>
-                    
-                    <TouchableOpacity 
-                      style={styles.socialButton}
-                      onPress={() => handleSocialLogin('Facebook')}
-                    >
-                      <Icon name="facebook" size={24} color={colors.text} />
-                    </TouchableOpacity>
-                    
-                    <TouchableOpacity 
-                      style={styles.socialButton}
-                      onPress={() => handleSocialLogin('Apple')}
-                    >
-                      <Icon name="phone-iphone" size={24} color={colors.text} />
-                    </TouchableOpacity>
-                  </View>
 
                   {/* Register Link */}
                   <View style={styles.linkContainer}>

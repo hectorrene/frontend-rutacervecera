@@ -1,25 +1,6 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { API_BASE_URL } from '../config/api';
+import { apiService } from './ApiService';
 
-export interface User {
-  _id: string;
-  name: string;
-  email: string;
-  phone: string;
-  birthDate: string;
-  photo: string;
-  accountType: 'business' | 'user';
-  createdAt: string;
-  updatedAt: string;
-}
-
-export interface AuthResponse {
-  success: boolean;
-  message: string;
-  user?: User;
-  token?: string;
-}
-
+// Tipos para las peticiones de autenticación
 export interface LoginData {
   email: string;
   password: string;
@@ -29,323 +10,405 @@ export interface RegisterData {
   name: string;
   email: string;
   phone: string;
-  birthDate: string;
+  birthDate: string; // ISO string format
   password: string;
   photo?: string;
-  accountType?: 'business' | 'user';
+  accountType?: 'user' | 'business';
+}
+
+export interface UpdateProfileData {
+  name?: string;
+  phone?: string;
+  birthDate?: string;
+  photo?: string;
+}
+
+export interface ChangePasswordData {
+  currentPassword: string;
+  newPassword: string;
+}
+
+// Tipo para la respuesta del usuario
+export interface User {
+  _id: string;
+  name: string;
+  email: string;
+  phone: string;
+  birthDate: string;
+  photo: string;
+  accountType: 'user' | 'business';
+  createdAt: string;
+  updatedAt: string;
+}
+
+// Tipo para las respuestas de autenticación
+export interface AuthResponse {
+  success: boolean;
+  message: string;
+  user?: User;
+  token?: string;
 }
 
 class AuthService {
-  private static instance: AuthService;
   private currentUser: User | null = null;
-  private token: string | null = null;
-  private isInitialized: boolean = false;
-  private initializePromise: Promise<void> | null = null;
 
-  private constructor() {}
-
-  public static getInstance(): AuthService {
-    if (!AuthService.instance) {
-      AuthService.instance = new AuthService();
-    }
-    return AuthService.instance;
+  constructor() {
+    console.log('🔐 AuthService initialized');
   }
 
-  // ✅ Método mejorado de inicialización con singleton pattern
-  public async initialize(): Promise<void> {
-    if (this.isInitialized) return;
-    
-    // Si ya está inicializando, esperar a que termine
-    if (this.initializePromise) {
-      return this.initializePromise;
-    }
-
-    this.initializePromise = this.loadStoredAuth();
-    await this.initializePromise;
-    this.isInitialized = true;
-  }
-
-  private async loadStoredAuth(): Promise<void> {
-    try {
-      console.log('📱 Cargando datos de autenticación almacenados...');
-      
-      const [storedToken, storedUser] = await AsyncStorage.multiGet(['authToken', 'authUser']);
-      
-      const token = storedToken[1];
-      const userStr = storedUser[1];
-      
-      if (token && userStr) {
-        this.token = token;
-        this.currentUser = JSON.parse(userStr);
-        console.log('✅ Datos de autenticación cargados correctamente');
-      } else {
-        console.log('ℹ️ No hay datos de autenticación almacenados');
-      }
-    } catch (error) {
-      console.error('❌ Error cargando datos almacenados:', error);
-      await this.clearStoredAuth();
-    }
-  }
-
-  private async clearStoredAuth(): Promise<void> {
-    try {
-      await AsyncStorage.multiRemove(['authToken', 'authUser']);
-      this.currentUser = null;
-      this.token = null;
-    } catch (error) {
-      console.error('Error limpiando datos almacenados:', error);
-    }
-  }
-
-  // ✅ Método helper para hacer requests con mejor manejo de errores
-  private async makeRequest(
-    endpoint: string, 
-    options: RequestInit = {}
-  ): Promise<Response> {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 15000);
-
-    try {
-      const response = await fetch(`${API_BASE_URL}${endpoint}`, {
-        ...options,
-        signal: controller.signal,
-        headers: {
-          'Content-Type': 'application/json',
-          ...options.headers,
-        },
-      });
-
-      clearTimeout(timeoutId);
-      return response;
-    } catch (error) {
-      clearTimeout(timeoutId);
-      throw error;
-    }
-  }
-
-  public async register(userData: RegisterData): Promise<AuthResponse> {
-    try {
-      console.log('📝 Registrando usuario...');
-      
-      const response = await this.makeRequest('/auth/register', {
-        method: 'POST',
-        body: JSON.stringify(userData),
-      });
-
-      const data = await response.json();
-
-      if (data.success && data.user && data.token) {
-        await this.storeAuthData(data.user, data.token);
-        console.log('✅ Usuario registrado correctamente');
-      }
-
-      return data;
-    } catch (error: unknown) {
-      console.error('❌ Error en registro:', error);
-      return {
-        success: false,
-        message: this.getErrorMessage(error),
-      };
-    }
-  }
-
-  public async login(loginData: LoginData): Promise<AuthResponse> {
-    try {
-      console.log('🔐 Iniciando sesión...');
-      
-      const response = await this.makeRequest('/auth/login', {
-        method: 'POST',
-        body: JSON.stringify(loginData),
-      });
-
-      const data = await response.json();
-
-      if (data.success && data.user && data.token) {
-        await this.storeAuthData(data.user, data.token);
-        console.log('✅ Sesión iniciada correctamente');
-      }
-
-      return data;
-    } catch (error: unknown) {
-      console.error('❌ Error en login:', error);
-      return {
-        success: false,
-        message: this.getErrorMessage(error),
-      };
-    }
-  }
-
-  public async logout(): Promise<void> {
-    try {
-      console.log('🚪 Cerrando sesión...');
-      
-      // Intentar hacer logout en el servidor si hay token
-      if (this.token) {
-        try {
-          await this.makeRequest('/auth/logout', {
-            method: 'POST',
-            headers: {
-              'Authorization': `Bearer ${this.token}`,
-            },
-          });
-        } catch (error) {
-          console.log('⚠️ Error en logout del servidor, continuando con limpieza local');
-        }
-      }
-      
-      await this.clearStoredAuth();
-      console.log('✅ Sesión cerrada correctamente');
-    } catch (error: unknown) {
-      console.error('❌ Error en logout:', error);
-      // Forzar limpieza local aunque falle
-      await this.clearStoredAuth();
-    }
-  }
-
-  public getCurrentUser(): User | null {
+  // ✅ NUEVO: Método para obtener el usuario actual
+  getCurrentUser(): User | null {
     return this.currentUser;
   }
 
-  public isAuthenticated(): boolean {
-    return this.currentUser !== null && this.token !== null;
+  // ✅ NUEVO: Método para establecer el usuario actual
+  setCurrentUser(user: User | null): void {
+    this.currentUser = user;
+    console.log('👤 AuthService: Current user set:', user ? user.email : 'null');
   }
 
-  public getToken(): string | null {
-    return this.token;
-  }
-
-  public async getUserProfile(): Promise<AuthResponse> {
+  // Registrar usuario
+  async register(userData: RegisterData): Promise<AuthResponse> {
     try {
-      if (!this.token) {
-        return {
-          success: false,
-          message: 'No hay token de autenticación',
+      console.log('📝 AuthService: Starting registration for:', userData.email);
+      console.log('📝 AuthService: Registration data:', { ...userData, password: '***' });
+
+      const response = await apiService.post('/auth/register', userData, false);
+      console.log('📝 AuthService: Registration API response:', response);
+
+      if (response.success && response.data) {
+        // Guardar token si viene en la respuesta
+        if (response.data.token) {
+          console.log('🔑 AuthService: Saving token from registration');
+          await apiService.saveToken(response.data.token);
+        }
+
+        // ✅ NUEVO: Guardar el usuario actual
+        const user = response.data.user || response.data;
+        this.setCurrentUser(user);
+
+        const result = {
+          success: true,
+          message: response.message || 'Usuario registrado exitosamente',
+          user: user,
+          token: response.data.token
         };
+
+        console.log('✅ AuthService: Registration successful:', result);
+        return result;
       }
 
-      console.log('👤 Obteniendo perfil de usuario...');
-      
-      const response = await this.makeRequest('/auth/profile', {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${this.token}`,
-        },
-      });
+      const errorResult = {
+        success: false,
+        message: response.message || 'Error al registrar usuario'
+      };
 
-      const data = await response.json();
+      console.log('❌ AuthService: Registration failed:', errorResult);
+      return errorResult;
 
-      if (data.success && data.user) {
-        await this.updateStoredUser(data.user);
-        console.log('✅ Perfil obtenido correctamente');
-      }
-
-      return data;
-    } catch (error: unknown) {
-      console.error('❌ Error obteniendo perfil:', error);
+    } catch (error) {
+      console.error('❌ AuthService: Register error:', error);
       return {
         success: false,
-        message: this.getErrorMessage(error),
+        message: 'Error de conexión durante el registro'
       };
     }
   }
 
-  public async updateProfile(updateData: Partial<RegisterData>): Promise<AuthResponse> {
+  // Iniciar sesión
+  async login(credentials: LoginData): Promise<AuthResponse> {
     try {
-      if (!this.token) {
-        return {
-          success: false,
-          message: 'No hay token de autenticación',
+      console.log('🔑 AuthService: Starting login for:', credentials.email);
+
+      const response = await apiService.post('/auth/login', credentials, false);
+      console.log('🔑 AuthService: Login API response:', response);
+
+      if (response.success && response.data) {
+        // Guardar token
+        if (response.data.token) {
+          console.log('🔑 AuthService: Saving token from login');
+          await apiService.saveToken(response.data.token);
+        }
+
+        // ✅ ACTUALIZADO: Guardar el usuario actual
+        const user = response.data.user || response.data;
+        this.setCurrentUser(user);
+
+        const result = {
+          success: true,
+          message: response.message || 'Login exitoso',
+          user: user,
+          token: response.data.token
         };
+
+        console.log('✅ AuthService: Login successful:', result);
+        return result;
       }
 
-      console.log('📝 Actualizando perfil...');
-      
-      const response = await this.makeRequest('/auth/profile', {
-        method: 'PUT',
-        headers: {
-          'Authorization': `Bearer ${this.token}`,
-        },
-        body: JSON.stringify(updateData),
-      });
+      const errorResult = {
+        success: false,
+        message: response.message || 'Credenciales inválidas'
+      };
 
-      const data = await response.json();
+      console.log('❌ AuthService: Login failed:', errorResult);
+      return errorResult;
 
-      if (data.success && data.user) {
-        await this.updateStoredUser(data.user);
-        console.log('✅ Perfil actualizado correctamente');
-      }
-
-      return data;
-    } catch (error: unknown) {
-      console.error('❌ Error actualizando perfil:', error);
+    } catch (error) {
+      console.error('❌ AuthService: Login error:', error);
       return {
         success: false,
-        message: this.getErrorMessage(error),
+        message: 'Error de conexión durante el login'
       };
     }
   }
 
-  public async validateToken(): Promise<boolean> {
+  // Validar token actual
+  async validateToken(): Promise<AuthResponse> {
     try {
-      if (!this.token) return false;
+      console.log('🔍 AuthService: Starting token validation');
 
-      console.log('🔍 Validando token...');
-      
-      const response = await this.makeRequest('/auth/validate', {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${this.token}`,
-        },
-      });
+      const response = await apiService.get('/auth/validate');
+      console.log('🔍 AuthService: Token validation API response:', response);
 
-      const data = await response.json();
-      
-      const isValid = data.success && response.ok;
-      console.log('🔍 Token válido:', isValid);
-      
-      if (!isValid) {
-        await this.clearStoredAuth();
+      if (response.success && response.data) {
+        // ✅ ACTUALIZADO: Guardar el usuario actual
+        const user = response.data.user || response.data;
+        this.setCurrentUser(user);
+
+        const result = {
+          success: true,
+          message: 'Token válido',
+          user: user
+        };
+
+        console.log('✅ AuthService: Token validation successful:', result);
+        return result;
       }
+
+      // Token inválido, eliminar del storage
+      console.log('❌ AuthService: Invalid token, removing from storage');
+      await apiService.removeToken();
+      this.setCurrentUser(null); // ✅ NUEVO: Limpiar usuario actual
       
-      return isValid;
-    } catch (error: unknown) {
-      console.error('❌ Error validando token:', error);
+      const errorResult = {
+        success: false,
+        message: 'Token inválido'
+      };
+
+      console.log('❌ AuthService: Token validation failed:', errorResult);
+      return errorResult;
+
+    } catch (error) {
+      console.error('❌ AuthService: Token validation error:', error);
+      await apiService.removeToken();
+      this.setCurrentUser(null); // ✅ NUEVO: Limpiar usuario actual
+      return {
+        success: false,
+        message: 'Error al validar token'
+      };
+    }
+  }
+
+  // Obtener perfil del usuario
+  async getProfile(): Promise<AuthResponse> {
+    try {
+      console.log('👤 AuthService: Getting user profile');
+
+      const response = await apiService.get('/auth/profile');
+      console.log('👤 AuthService: Get profile API response:', response);
+
+      if (response.success && response.data) {
+        // ✅ NUEVO: Actualizar el usuario actual
+        const user = response.data.user || response.data;
+        this.setCurrentUser(user);
+
+        const result = {
+          success: true,
+          message: 'Perfil obtenido exitosamente',
+          user: user
+        };
+
+        console.log('✅ AuthService: Get profile successful:', result);
+        return result;
+      }
+
+      const errorResult = {
+        success: false,
+        message: response.message || 'Error al obtener perfil'
+      };
+
+      console.log('❌ AuthService: Get profile failed:', errorResult);
+      return errorResult;
+
+    } catch (error) {
+      console.error('❌ AuthService: Get profile error:', error);
+      return {
+        success: false,
+        message: 'Error al obtener perfil'
+      };
+    }
+  }
+
+  // Actualizar perfil
+  async updateProfile(profileData: UpdateProfileData): Promise<AuthResponse> {
+    try {
+      console.log('📝 AuthService: Updating profile with data:', profileData);
+
+      const response = await apiService.put('/auth/profile', profileData);
+      console.log('📝 AuthService: Update profile API response:', response);
+
+      if (response.success && response.data) {
+        // ✅ NUEVO: Actualizar el usuario actual
+        const user = response.data.user || response.data;
+        this.setCurrentUser(user);
+
+        const result = {
+          success: true,
+          message: response.message || 'Perfil actualizado exitosamente',
+          user: user
+        };
+
+        console.log('✅ AuthService: Update profile successful:', result);
+        return result;
+      }
+
+      const errorResult = {
+        success: false,
+        message: response.message || 'Error al actualizar perfil'
+      };
+
+      console.log('❌ AuthService: Update profile failed:', errorResult);
+      return errorResult;
+
+    } catch (error) {
+      console.error('❌ AuthService: Update profile error:', error);
+      return {
+        success: false,
+        message: 'Error al actualizar perfil'
+      };
+    }
+  }
+
+  // Cambiar contraseña
+  async changePassword(passwordData: ChangePasswordData): Promise<AuthResponse> {
+    try {
+      console.log('🔒 AuthService: Changing password');
+
+      const response = await apiService.put('/auth/change-password', passwordData);
+      console.log('🔒 AuthService: Change password API response:', response);
+
+      const result = {
+        success: response.success,
+        message: response.message || (response.success ? 'Contraseña actualizada' : 'Error al cambiar contraseña')
+      };
+
+      console.log('🔒 AuthService: Change password result:', result);
+      return result;
+
+    } catch (error) {
+      console.error('❌ AuthService: Change password error:', error);
+      return {
+        success: false,
+        message: 'Error al cambiar contraseña'
+      };
+    }
+  }
+
+  // Cerrar sesión
+  async logout(): Promise<AuthResponse> {
+    try {
+      console.log('🚪 AuthService: Starting logout');
+
+      // Intentar hacer logout en el servidor (opcional)
+      await apiService.post('/auth/logout');
+      console.log('🚪 AuthService: Server logout completed');
+      
+      // Eliminar token del storage
+      await apiService.removeToken();
+      console.log('🚪 AuthService: Token removed from storage');
+
+      // ✅ NUEVO: Limpiar usuario actual
+      this.setCurrentUser(null);
+
+      const result = {
+        success: true,
+        message: 'Logout exitoso'
+      };
+
+      console.log('✅ AuthService: Logout successful:', result);
+      return result;
+
+    } catch (error) {
+      console.error('❌ AuthService: Logout error:', error);
+      // Aunque falle el logout del servidor, eliminar token local
+      await apiService.removeToken();
+      this.setCurrentUser(null); // ✅ NUEVO: Limpiar usuario actual
+      console.log('🚪 AuthService: Token removed from storage (after error)');
+      
+      return {
+        success: true,
+        message: 'Logout exitoso'
+      };
+    }
+  }
+
+  // Verificar si hay token guardado
+  async hasToken(): Promise<boolean> {
+    try {
+      console.log('🔍 AuthService: Checking if token exists');
+      
+      const token = await apiService.getToken();
+      const hasToken = !!token;
+      
+      console.log('🔍 AuthService: Token exists:', hasToken);
+      return hasToken;
+    } catch (error) {
+      console.error('❌ AuthService: Error checking token:', error);
       return false;
     }
   }
 
-  private async storeAuthData(user: User, token: string): Promise<void> {
+  // ✅ NUEVO: Verificar si el usuario está autenticado
+  isAuthenticated(): boolean {
+    return this.currentUser !== null;
+  }
+
+  // ✅ NUEVO: Obtener el ID del usuario actual
+  getCurrentUserId(): string | null {
+    return this.currentUser?._id || null;
+  }
+
+  // ✅ NUEVO: Verificar si el usuario actual es business
+  isBusinessAccount(): boolean {
+    return this.currentUser?.accountType === 'business';
+  }
+
+  // ✅ NUEVO: Inicializar usuario desde token guardado (para cuando la app se abre)
+  async initializeFromToken(): Promise<boolean> {
     try {
-      await AsyncStorage.multiSet([
-        ['authToken', token],
-        ['authUser', JSON.stringify(user)],
-      ]);
+      console.log('🔄 AuthService: Initializing from stored token');
       
-      this.currentUser = user;
-      this.token = token;
-    } catch (error: unknown) {
-      console.error('❌ Error almacenando datos de auth:', error);
-    }
-  }
-
-  private async updateStoredUser(user: User): Promise<void> {
-    try {
-      await AsyncStorage.setItem('authUser', JSON.stringify(user));
-      this.currentUser = user;
-    } catch (error) {
-      console.error('❌ Error actualizando usuario almacenado:', error);
-    }
-  }
-
-  private getErrorMessage(error: unknown): string {
-    if (error instanceof Error) {
-      if (error.name === 'AbortError') {
-        return 'Tiempo de espera agotado. Verifica tu conexión.';
+      const hasToken = await this.hasToken();
+      if (!hasToken) {
+        console.log('🔄 AuthService: No token found');
+        return false;
       }
-      return error.message;
+
+      const response = await this.validateToken();
+      if (response.success && response.user) {
+        console.log('🔄 AuthService: Successfully initialized from token');
+        return true;
+      }
+
+      console.log('🔄 AuthService: Failed to initialize from token');
+      return false;
+    } catch (error) {
+      console.error('❌ AuthService: Error initializing from token:', error);
+      return false;
     }
-    return 'Error de conexión. Intenta de nuevo.';
   }
 }
 
-export default AuthService.getInstance();
+// Instancia singleton
+export const authService = new AuthService();
+export default AuthService;

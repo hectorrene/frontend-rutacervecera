@@ -105,7 +105,7 @@ const EditBarScreen: React.FC<Props> = ({ route, navigation }) => {
       setLoading(true);
       console.log('Loading bar data for barId:', barId);
       
-      const response = await BusinessService.getBar(barId);
+      const response = await BusinessService.getMyBar(barId);
       console.log('Bar data response:', response.data);
       
       if (response && response.data) {

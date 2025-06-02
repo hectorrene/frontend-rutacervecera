@@ -163,34 +163,6 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ navigation }) => {
                   </Text>
                 </View>
               </TouchableOpacity>
-
-              {/* Guest Access */}
-              <TouchableOpacity
-                style={styles.guestButton}
-                onPress={() => navigation.navigate('MainTabs')}
-                activeOpacity={0.7}
-              >
-                <Text style={styles.guestButtonText}>
-                  Continuar como invitado
-                </Text>
-                <Icon name="arrow-forward" size={16} color={colors.textSecondary} />
-              </TouchableOpacity>
-            </View>
-
-            {/* Bottom Info */}
-            <View style={styles.bottomInfo}>
-              <Text style={styles.versionText}>v1.0.0</Text>
-              <View style={styles.socialContainer}>
-                <TouchableOpacity style={styles.socialButton}>
-                  <Icon name="facebook" size={20} color={colors.textSecondary} />
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.socialButton}>
-                  <Icon name="alternate-email" size={20} color={colors.textSecondary} />
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.socialButton}>
-                  <Icon name="language" size={20} color={colors.textSecondary} />
-                </TouchableOpacity>
-              </View>
             </View>
           </Animated.View>
         </SafeAreaView>
