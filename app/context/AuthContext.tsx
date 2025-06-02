@@ -29,79 +29,164 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const initializeAuth = async () => {
     try {
       setIsLoading(true);
+      console.log('🔄 Iniciando autenticación...');
       
-      // Get stored user data
+      // ✅ CRÍTICO: Inicializar AuthService primero
+      await AuthService.initialize();
+      
+      // Obtener datos del usuario después de la inicialización
       const currentUser = AuthService.getCurrentUser();
+      const token = AuthService.getToken();
       
-      if (currentUser && AuthService.getToken()) {
-        // Validate token and refresh user data
-        const isValid = await AuthService.validateToken();
+      console.log('👤 Usuario almacenado:', currentUser ? 'Encontrado' : 'No encontrado');
+      console.log('🔑 Token almacenado:', token ? 'Encontrado' : 'No encontrado');
+      
+      if (currentUser && token) {
+        console.log('✅ Datos de autenticación encontrados');
         
-        if (isValid) {
-          const profileResponse = await AuthService.getUserProfile();
-          if (profileResponse.success && profileResponse.user) {
-            setUser(profileResponse.user);
+        // Intentar validar token pero con timeout más corto y manejo robusto
+        try {
+          const validationPromise = AuthService.validateToken();
+          const timeoutPromise = new Promise<boolean>((_, reject) => 
+            setTimeout(() => reject(new Error('Validation timeout')), 5000)
+          );
+          
+          const isValid = await Promise.race([validationPromise, timeoutPromise]);
+          
+          if (isValid) {
+            console.log('✅ Token válido');
+            setUser(currentUser);
+            
+            // Intentar refrescar perfil en background (no bloquear la UI)
+            AuthService.getUserProfile()
+              .then(profileResponse => {
+                if (profileResponse.success && profileResponse.user) {
+                  console.log('✅ Perfil actualizado en background');
+                  setUser(profileResponse.user);
+                }
+              })
+              .catch(error => {
+                console.log('⚠️ Error actualizando perfil en background:', error);
+                // No hacer nada, mantener el usuario actual
+              });
           } else {
-            // Token invalid, clear auth data
+            console.log('❌ Token inválido, limpiando datos');
             await AuthService.logout();
             setUser(null);
           }
-        } else {
-          // Token invalid, clear auth data
-          await AuthService.logout();
-          setUser(null);
+        } catch (error) {
+          console.log('⏱️ Error o timeout en validación, usando datos locales');
+          // En caso de error de red, usar datos almacenados temporalmente
+          setUser(currentUser);
+          
+          // Intentar validar en background
+          setTimeout(async () => {
+            try {
+              const isValid = await AuthService.validateToken();
+              if (!isValid) {
+                console.log('❌ Token inválido detectado en background');
+                await AuthService.logout();
+                setUser(null);
+              }
+            } catch (bgError) {
+              console.log('⚠️ Error en validación de background:', bgError);
+            }
+          }, 2000);
         }
+      } else {
+        console.log('ℹ️ No hay datos de autenticación almacenados');
+        setUser(null);
       }
     } catch (error) {
-      console.error('Auth initialization error:', error);
-      await AuthService.logout();
+      console.error('💥 Error crítico en inicialización:', error);
+      // En caso de error crítico, limpiar todo y continuar
+      try {
+        await AuthService.logout();
+      } catch (logoutError) {
+        console.error('Error en logout de emergencia:', logoutError);
+      }
       setUser(null);
     } finally {
+      console.log('🏁 Inicialización completada');
       setIsLoading(false);
     }
   };
 
   const login = async (loginData: LoginData): Promise<AuthResponse> => {
-    const response = await AuthService.login(loginData);
-    
-    if (response.success && response.user) {
-      setUser(response.user);
-    }
-    
-    return response;
-  };
-
-  const register = async (registerData: RegisterData): Promise<AuthResponse> => {
-    const response = await AuthService.register(registerData);
-    
-    if (response.success && response.user) {
-      setUser(response.user);
-    }
-    
-    return response;
-  };
-
-  const logout = async (): Promise<void> => {
-    await AuthService.logout();
-    setUser(null);
-  };
-
-  const updateProfile = async (updateData: Partial<RegisterData>): Promise<AuthResponse> => {
-    const response = await AuthService.updateProfile(updateData);
-    
-    if (response.success && response.user) {
-      setUser(response.user);
-    }
-    
-    return response;
-  };
-
-  const refreshProfile = async (): Promise<void> => {
-    if (AuthService.isAuthenticated()) {
-      const response = await AuthService.getUserProfile();
+    try {
+      const response = await AuthService.login(loginData);
+      
       if (response.success && response.user) {
         setUser(response.user);
       }
+      
+      return response;
+    } catch (error) {
+      console.error('Error en login del contexto:', error);
+      return {
+        success: false,
+        message: 'Error inesperado en el login'
+      };
+    }
+  };
+
+  const register = async (registerData: RegisterData): Promise<AuthResponse> => {
+    try {
+      const response = await AuthService.register(registerData);
+      
+      if (response.success && response.user) {
+        setUser(response.user);
+      }
+      
+      return response;
+    } catch (error) {
+      console.error('Error en register del contexto:', error);
+      return {
+        success: false,
+        message: 'Error inesperado en el registro'
+      };
+    }
+  };
+
+  const logout = async (): Promise<void> => {
+    try {
+      await AuthService.logout();
+      setUser(null);
+    } catch (error) {
+      console.error('Error en logout del contexto:', error);
+      // Forzar limpieza local aunque falle el logout remoto
+      setUser(null);
+    }
+  };
+
+  const updateProfile = async (updateData: Partial<RegisterData>): Promise<AuthResponse> => {
+    try {
+      const response = await AuthService.updateProfile(updateData);
+      
+      if (response.success && response.user) {
+        setUser(response.user);
+      }
+      
+      return response;
+    } catch (error) {
+      console.error('Error en updateProfile del contexto:', error);
+      return {
+        success: false,
+        message: 'Error inesperado actualizando el perfil'
+      };
+    }
+  };
+
+  const refreshProfile = async (): Promise<void> => {
+    try {
+      if (AuthService.isAuthenticated()) {
+        const response = await AuthService.getUserProfile();
+        if (response.success && response.user) {
+          setUser(response.user);
+        }
+      }
+    } catch (error) {
+      console.error('Error en refreshProfile:', error);
     }
   };
 

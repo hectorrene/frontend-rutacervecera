@@ -2,24 +2,24 @@ import { RouteProp } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import React, { useEffect, useState } from 'react';
 import {
-  ActivityIndicator,
-  Dimensions,
-  Image,
-  Linking,
-  Platform,
-  RefreshControl,
-  ScrollView,
-  Share,
-  StatusBar,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View
+    ActivityIndicator,
+    Dimensions,
+    Image,
+    Linking,
+    Platform,
+    RefreshControl,
+    ScrollView,
+    Share,
+    StatusBar,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/MaterialIcons';
-import BarService from '../../services/BarService';
-import { EventsStackParamList } from '../../types/navigation';
+import BarService from '../../../services/BarService';
+import { EventsStackParamList } from '../../../types/navigation';
 
 const { width, height } = Dimensions.get('window');
 const isTablet = width >= 768;

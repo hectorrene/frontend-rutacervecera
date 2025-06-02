@@ -15,7 +15,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/MaterialIcons';
-import { useAuth } from '../../context/AuthContext';
+import { useAuth } from '../../../context/AuthContext';
 
 const { width, height } = Dimensions.get('window');
 const isTablet = width >= 768;
@@ -54,10 +54,16 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
   const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
+    console.log('[ProfileScreen] useEffect - user:', user);
     if (user) {
+      console.log('[ProfileScreen] Calling refreshProfile');
       refreshProfile();
     }
   }, []);
+
+  useEffect(() => {
+    console.log('[ProfileScreen] user changed:', user);
+  }, [user]);
 
   const onRefresh = async () => {
     setRefreshing(true);
@@ -101,7 +107,7 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
   const handleShare = async () => {
     try {
       await Share.share({
-        message: `¡Sígueme en la app de bares! Mi perfil: ${user?.name}`,
+        message: `Mire profe ${user?.name} me mandó mensaje en whatsapp`,
         title: 'Compartir perfil',
       });
     } catch (error) {
@@ -301,9 +307,20 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
               <Text style={styles.quickActionText}>Editar Perfil</Text>
             </TouchableOpacity>
             
-            <TouchableOpacity style={styles.quickActionCard}>
+            <TouchableOpacity 
+              style={styles.quickActionCard}
+              onPress={() => navigation.navigate('Favorites')}
+            >
               <Icon name="favorite" size={24} color={colors.error} />
               <Text style={styles.quickActionText}>Favoritos</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity 
+              style={styles.quickActionCard}
+              onPress={() => navigation.navigate('BusinessBars')}
+            >
+              <Icon name="business" size={24} color={colors.error} />
+              <Text style={styles.quickActionText}> Gestionar negocios </Text>
             </TouchableOpacity>
 
           </View>

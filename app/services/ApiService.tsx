@@ -1,7 +1,13 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
+import { Platform } from 'react-native';
 
-const API_BASE_URL = 'http://localhost:3000/api'; 
+// ✅ Usar la misma URL base que AuthService
+const API_BASE_URL = Platform.select({
+  ios: 'http://192.168.100.191:3000/api',
+  android: 'http://10.0.2.2:3000/api',
+  default: 'http://192.168.100.191:3000/api'
+});
 
 const api = axios.create({
   baseURL: API_BASE_URL,
@@ -14,13 +20,34 @@ const api = axios.create({
 // Add auth token to requests
 api.interceptors.request.use(
   async (config) => {
-    const token = await AsyncStorage.getItem('authToken');
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
+    try {
+      const token = await AsyncStorage.getItem('authToken');
+      if (token) {
+        config.headers.Authorization = `Bearer ${token}`;
+      }
+    } catch (error) {
+      console.error('Error obteniendo token para request:', error);
     }
     return config;
   },
   (error) => Promise.reject(error)
+);
+
+// ✅ Agregar interceptor de respuesta para manejar errores de autenticación
+api.interceptors.response.use(
+  (response) => response,
+  async (error) => {
+    if (error.response?.status === 401) {
+      // Token expirado o inválido
+      console.log('🔑 Token inválido, limpiando datos de autenticación');
+      try {
+        await AsyncStorage.multiRemove(['authToken', 'authUser']);
+      } catch (storageError) {
+        console.error('Error limpiando storage:', storageError);
+      }
+    }
+    return Promise.reject(error);
+  }
 );
 
 // Bar endpoints

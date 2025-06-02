@@ -2,6 +2,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios, { AxiosResponse } from 'axios';
 import { Platform } from 'react-native';
 import { HandleLoginError } from "../../helpers/ErrorHandler";
+import AuthService from './AuthService';
+
 
 const API_BASE_URL = Platform.select({
   ios: 'http://192.168.100.191:3000/api',
@@ -140,7 +142,7 @@ class BarService {
     }
   }
 
-  // Get my profile
+  // mi perfil
   async getMyProfile(): Promise<AxiosResponse> {
     try {
       return await this.api.get('/users/me');
@@ -150,7 +152,7 @@ class BarService {
     }
   }
 
-  // Update profile
+  // Actualizar perfil
   async updateProfile(userData: any): Promise<AxiosResponse> {
     try {
       return await this.api.put('/users/me', userData);
@@ -160,11 +162,51 @@ class BarService {
     }
   }
 
-  //  favoritos
-  async toggleFavorite(barId: string, action: 'add'|'remove') {
-    return action === 'add' 
-      ? this.api.post(`/bars/${barId}/favorites`)
-      : this.api.delete(`/bars/${barId}/favorites`);
+  // Agregar a favoritos
+  async addBarToFavorites(barId: string): Promise<AxiosResponse> {
+    const userId = AuthService.getCurrentUser()?._id;
+    if (!userId) throw new Error('User not authenticated');
+    
+    try {
+      return await this.api.post(`/users/${userId}/favorites/${barId}`);
+    } catch (error) {
+      if (axios.isAxiosError(error)) {
+        const message = error.response?.data?.message || error.message;
+        throw new Error(message);
+      }
+      throw error;
+    }
+  }
+
+  // eliminar de favoritos
+  async removeBarFromFavorites(barId: string): Promise<AxiosResponse> {
+    const userId = AuthService.getCurrentUser()?._id;
+    if (!userId) throw new Error('User not authenticated');
+    
+    return await this.api.delete(`/users/${userId}/favorites/${barId}`);
+  }
+
+  // verificar si un bar es favorito
+  async isBarFavorite(barId: string): Promise<boolean> {
+    const userId = AuthService.getCurrentUser()?._id;
+    if (!userId) return false;
+    
+    try {
+      const response = await this.api.get(`/users/${userId}/favorites/${barId}/check`);
+      return response.data.isFavorite;
+    } catch (error) {
+      return false;
+    }
+  }
+
+  // Jala los favoritos de un usuario
+  async getFavorites(userId: string): Promise<AxiosResponse> {
+    try {
+      return await this.api.get(`/users/${userId}/favorites`);
+    } catch (error) {
+      HandleLoginError(error);
+      throw error;
+    }
   }
 }
 

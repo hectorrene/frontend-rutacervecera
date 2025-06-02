@@ -2,26 +2,11 @@ import { RouteProp } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import axios from 'axios';
 import React, { useEffect, useState } from 'react';
-import {
-  ActivityIndicator,
-  Alert,
-  Dimensions,
-  Image,
-  Linking,
-  Platform,
-  RefreshControl,
-  ScrollView,
-  StatusBar,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View
-} from 'react-native';
+import { ActivityIndicator, Alert, Dimensions, Image, Linking, Platform, RefreshControl, ScrollView, StatusBar, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/MaterialIcons';
-import { BarsStackParamList } from '../../navigation/userNavigation';
-import BarService from '../../services/BarService';
-
+import { BarsStackParamList } from '../../../navigation/userNavigation';
+import BarService from '../../../services/BarService';
 const { width, height } = Dimensions.get('window');
 const isTablet = width >= 768;
 const isDesktop = width >= 1024;
@@ -113,8 +98,11 @@ const BarDetailsScreen: React.FC<BarDetailsScreenProps> = ({ route, navigation }
   const [events, setEvents] = useState<Event[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [isFavorite, setIsFavorite] = useState(false);
   const [activeTab, setActiveTab] = useState<'menu' | 'events' | 'reviews'>('menu');
 
+
+  
   const fetchBarData = async () => {
     try {
       const barResponse = await BarService.getBarById(barId);
@@ -135,7 +123,7 @@ const BarDetailsScreen: React.FC<BarDetailsScreenProps> = ({ route, navigation }
         console.error('Error fetching menu items:', menuError);
         setMenu([]);
       }
-
+      
       try {
         const reviewsResponse = await BarService.getReviewsByBarId(barId);
         setReviews(reviewsResponse.data);
@@ -367,6 +355,36 @@ const BarDetailsScreen: React.FC<BarDetailsScreenProps> = ({ route, navigation }
     }
   };
 
+  const handleAddToFavorites = async () => {
+    try {
+      setLoading(true);
+      
+      if (isFavorite) {
+        // If already a favorite, remove it
+        await BarService.removeBarFromFavorites(barId);
+        setIsFavorite(false);
+        Alert.alert('Removed', 'Bar removed from favorites!');
+      } else {
+        // If not a favorite, add it
+        await BarService.addBarToFavorites(barId);
+        setIsFavorite(true);
+        Alert.alert('Success', 'Bar added to favorites!');
+      }
+      
+    } catch (error) {
+      // Revert the UI state if the operation fails
+      setIsFavorite(!isFavorite);
+      
+      if (error instanceof Error) {
+        Alert.alert('Error', error.message);
+      } else {
+        Alert.alert('Error', 'An unknown error occurred');
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
   if (loading) {
     return (
       <SafeAreaView style={styles.loadingContainer}>
@@ -425,8 +443,8 @@ const BarDetailsScreen: React.FC<BarDetailsScreenProps> = ({ route, navigation }
               <Icon name="arrow-back" size={24} color={colors.text} />
             </TouchableOpacity>
             <View style={styles.headerActions}>
-              <TouchableOpacity style={styles.actionButton}>
-                <Icon name="favorite-border" size={24} color={colors.text} />
+              <TouchableOpacity style={styles.actionButton} onPress={handleAddToFavorites}>
+                <Icon name={isFavorite ? 'favorite' : 'favorite-border'} size={24} color={colors.text} />
               </TouchableOpacity>
               <TouchableOpacity style={styles.actionButton}>
                 <Icon name="share" size={24} color={colors.text} />
@@ -445,15 +463,15 @@ const BarDetailsScreen: React.FC<BarDetailsScreenProps> = ({ route, navigation }
         <View style={styles.infoContainer}>
           <Text style={styles.barName}>{bar.name}</Text>
           
-          {/* Rating */}
-          <View style={styles.ratingContainer}>
-            <View style={styles.starsContainer}>
-              {renderStars(Math.round(bar.ratingAverage), 18)}
-            </View>
-            <Text style={styles.ratingText}>
-              {bar.ratingAverage.toFixed(1)} • {bar.ratingQuantity} reviews
-            </Text>
+        {/* Rating */}
+        <View style={styles.ratingContainer}>
+          <View style={styles.starsContainer}>
+            {renderStars(Math.round(bar.ratingAverage || 0), 18)}
           </View>
+          <Text style={styles.ratingText}>
+            {(bar.ratingAverage || 0).toFixed(1)} • {bar.ratingQuantity || 0} review{bar.ratingQuantity !== 1 ? 's' : ''}
+          </Text>
+        </View>
 
           {/* Tags */}
           {bar.tags.length > 0 && (

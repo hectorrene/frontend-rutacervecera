@@ -2,19 +2,19 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 import { Picker } from '@react-native-picker/picker';
 import React, { useState } from 'react';
 import {
-  ActivityIndicator,
-  Alert,
-  KeyboardAvoidingView,
-  Platform,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
+    ActivityIndicator,
+    Alert,
+    KeyboardAvoidingView,
+    Platform,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View,
 } from 'react-native';
-import { useAuth } from '../../context/AuthContext';
-import { RegisterData } from '../../services/AuthService';
+import { useAuth } from '../../../context/AuthContext';
+import { RegisterData } from '../../../services/AuthService';
 
 interface RegisterScreenProps {
   navigation: any;

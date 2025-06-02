@@ -18,8 +18,8 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/MaterialIcons';
-import { useAuth } from '../../context/AuthContext';
-import { LoginData } from '../../services/AuthService';
+import { useAuth } from '../../../context/AuthContext';
+import { LoginData } from '../../../services/AuthService';
 
 const { width, height } = Dimensions.get('window');
 const isTablet = width >= 768;

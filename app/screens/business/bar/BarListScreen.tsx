@@ -1,24 +1,13 @@
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import {
-  ActivityIndicator,
-  Alert,
-  Dimensions,
-  Image,
-  Linking,
-  Platform,
-  RefreshControl,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
+    ActivityIndicator, Alert, Dimensions, Image, Platform, RefreshControl, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/MaterialIcons';
-import { BarsStackParamList } from '../../navigation/userNavigation';
-import BarService from '../../services/BarService';
+import { BusinessStackParamList } from '../../../navigation/userNavigation';
+import BusinessService from '../../../services/BusinessService';
 
 const { width } = Dimensions.get('window');
 const isTablet = width >= 768;
@@ -45,81 +34,81 @@ const colors = {
   starEmpty: '#52525b',
 };
 
-type BarsListScreenNavigationProp = StackNavigationProp<BarsStackParamList, 'BarsList'>;
-
-interface BarsListScreenProps {
-  navigation: BarsListScreenNavigationProp;
-}
-
-interface Address {
-  street?: string;
-  city: string;
-  state: string;
-  zipCode?: string;
-}
+type BusinessBarNavigationProp = StackNavigationProp<BusinessStackParamList, 'BusinessDashboard'>;
 
 interface Bar {
   _id: string;
   name: string;
-  description: string;
+  description?: string;
   photo?: string;
-  address: Address;
-  mapsUrl?: string;
+  address?: {
+    street: string;
+    city: string;
+    state: string;
+    zipCode: string;
+  };
   phone?: string;
-  tags: string[];
-  ratingAverage: number;
-  ratingQuantity: number;
+  type?: string[];
+  ratingAverage?: number;
+  ratingQuantity?: number;
 }
 
-const BarsListScreen: React.FC<BarsListScreenProps> = ({ navigation }) => {
+const BarListScreen: React.FC = () => {
+  const navigation = useNavigation<BusinessBarNavigationProp>();
   const [bars, setBars] = useState<Bar[]>([]);
   const [filteredBars, setFilteredBars] = useState<Bar[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
-  const fetchBars = async () => {
+  // Cargar bares al entrar a la pantalla
+  useFocusEffect(
+    React.useCallback(() => {
+      loadBars();
+    }, [])
+  );
+
+  const loadBars = async () => {
     try {
-      const response = await BarService.allBars();
-      setBars(response.data);
-      setFilteredBars(response.data);
+      setLoading(true);
+      const response = await BusinessService.getMyBars();
+      const barsData = response.data || [];
+      setBars(barsData);
+      setFilteredBars(barsData);
     } catch (error) {
-      console.error('Error fetching bars:', error);
-      Alert.alert('Error', 'Failed to load bars');
+      console.error('Error cargando bares:', error);
+      Alert.alert('Error', 'No se pudieron cargar los bares');
     } finally {
       setLoading(false);
-      setRefreshing(false);
     }
   };
 
-  useEffect(() => {
-    fetchBars();
-  }, []);
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await loadBars();
+    setRefreshing(false);
+  };
 
-  useEffect(() => {
+  // Filter bars based on search query
+  React.useEffect(() => {
     if (searchQuery.trim() === '') {
       setFilteredBars(bars);
     } else {
       const filtered = bars.filter(bar =>
         bar.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        bar.tags.some(tag => tag.toLowerCase().includes(searchQuery.toLowerCase())) ||
-        bar.address.city.toLowerCase().includes(searchQuery.toLowerCase())
+        bar.type?.some(type => type.toLowerCase().includes(searchQuery.toLowerCase())) ||
+        bar.address?.city.toLowerCase().includes(searchQuery.toLowerCase())
       );
       setFilteredBars(filtered);
     }
   }, [searchQuery, bars]);
 
-  const onRefresh = () => {
-    setRefreshing(true);
-    fetchBars();
-  };
+const handleBarPress = (bar: Bar) => {
+    navigation.navigate('BusinessDetails', { barId: bar._id, barName: bar.name });
+};
 
-  const handleMapsPress = (mapsUrl: string) => {
-    Linking.openURL(mapsUrl);
-  };
-
-  const handleBarPress = (barId: string) => {
-    navigation.navigate('BarDetails', { barId });
+  const handleCreateBar = () => {
+    navigation.navigate('CreateBarScreen');
   };
 
   const renderStars = (rating: number) => {
@@ -147,20 +136,54 @@ const BarsListScreen: React.FC<BarsListScreenProps> = ({ navigation }) => {
     return (
       <SafeAreaView style={styles.loadingContainer}>
         <ActivityIndicator size="large" color={colors.primary} />
-        <Text style={styles.loadingText}>Loading bars...</Text>
+        <Text style={styles.loadingText}>Cargando tus bares...</Text>
       </SafeAreaView>
     );
   }
 
-  if (filteredBars.length === 0) {
+  if (filteredBars.length === 0 && bars.length === 0) {
     return (
       <SafeAreaView style={styles.container}>
+        <View style={styles.header}>
+          <Text style={styles.headerTitle}>Panel de Negocios</Text>
+          <TouchableOpacity style={styles.addButton} onPress={handleCreateBar}>
+            <Icon name="add" size={20} color={colors.text} />
+            <Text style={styles.addButtonText}>Crear Bar</Text>
+          </TouchableOpacity>
+        </View>
+        
+        <View style={styles.errorContainer}>
+          <Icon name="store" size={48} color={colors.textMuted} />
+          <Text style={styles.errorText}>¡Bienvenido a tu Panel de Negocios!</Text>
+          <Text style={styles.errorSubtext}>
+            Aún no tienes bares registrados.{'\n'}
+            Crea tu primer bar para comenzar.
+          </Text>
+          <TouchableOpacity style={styles.createFirstButton} onPress={handleCreateBar}>
+            <Text style={styles.createFirstButtonText}>Crear Mi Primer Bar</Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  if (filteredBars.length === 0 && bars.length > 0) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.header}>
+          <Text style={styles.headerTitle}>Mis Bares</Text>
+          <TouchableOpacity style={styles.addButton} onPress={handleCreateBar}>
+            <Icon name="add" size={20} color={colors.text} />
+            <Text style={styles.addButtonText}>Agregar</Text>
+          </TouchableOpacity>
+        </View>
+
         <View style={styles.searchContainer}>
           <View style={styles.searchInputContainer}>
             <Icon name="search" size={20} color={colors.textMuted} style={styles.searchIcon} />
             <TextInput
               style={styles.searchInput}
-              placeholder="Search bars, tags, or cities..."
+              placeholder="Buscar bares, tipos, ciudades..."
               placeholderTextColor={colors.textMuted}
               value={searchQuery}
               onChangeText={setSearchQuery}
@@ -172,13 +195,12 @@ const BarsListScreen: React.FC<BarsListScreenProps> = ({ navigation }) => {
             )}
           </View>
         </View>
+        
         <View style={styles.errorContainer}>
           <Icon name="search-off" size={48} color={colors.textMuted} />
-          <Text style={styles.errorText}>
-            {bars.length === 0 ? 'No bars found' : 'No bars match your search'}
-          </Text>
+          <Text style={styles.errorText}>No se encontraron bares</Text>
           <Text style={styles.errorSubtext}>
-            {bars.length === 0 ? 'Try refreshing the page' : 'Try adjusting your search terms'}
+            Intenta ajustar los términos de búsqueda
           </Text>
         </View>
       </SafeAreaView>
@@ -188,8 +210,14 @@ const BarsListScreen: React.FC<BarsListScreenProps> = ({ navigation }) => {
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Discover Bars</Text>
-        <Text style={styles.headerSubtitle}>{filteredBars.length} bars found</Text>
+        <View>
+          <Text style={styles.headerTitle}>Mis Bares</Text>
+          <Text style={styles.headerSubtitle}>{filteredBars.length} bares encontrados</Text>
+        </View>
+        <TouchableOpacity style={styles.addButton} onPress={handleCreateBar}>
+          <Icon name="add" size={20} color={colors.text} />
+          <Text style={styles.addButtonText}>Agregar</Text>
+        </TouchableOpacity>
       </View>
 
       <View style={styles.searchContainer}>
@@ -197,7 +225,7 @@ const BarsListScreen: React.FC<BarsListScreenProps> = ({ navigation }) => {
           <Icon name="search" size={20} color={colors.textMuted} style={styles.searchIcon} />
           <TextInput
             style={styles.searchInput}
-            placeholder="Search bars, tags, or cities..."
+            placeholder="Buscar bares, tipos, ciudades..."
             placeholderTextColor={colors.textMuted}
             value={searchQuery}
             onChangeText={setSearchQuery}
@@ -232,21 +260,23 @@ const BarsListScreen: React.FC<BarsListScreenProps> = ({ navigation }) => {
                 isDesktop && styles.desktopCard,
                 isTablet && !isDesktop && styles.tabletCard
               ]}
-              onPress={() => handleBarPress(bar._id)}
+              onPress={() => handleBarPress(bar)}
               activeOpacity={0.8}
             >
               {/* Bar Image */}
               <View style={styles.imageContainer}>
                 <Image
-                  source={{ uri: bar.photo || 'https://via.placeholder.com/400x200?text=No+Image' }}
+                  source={{ uri: bar.photo || 'https://via.placeholder.com/400x200?text=Mi+Bar' }}
                   style={styles.barImage}
                   resizeMode="cover"
                 />
                 <View style={styles.imageOverlay}>
-                  <View style={styles.ratingBadge}>
-                    <Icon name="star" size={14} color={colors.star} />
-                    <Text style={styles.ratingBadgeText}>{bar.ratingAverage.toFixed(1)}</Text>
-                  </View>
+                  {bar.ratingAverage && (
+                    <View style={styles.ratingBadge}>
+                      <Icon name="star" size={14} color={colors.star} />
+                      <Text style={styles.ratingBadgeText}>{bar.ratingAverage.toFixed(1)}</Text>
+                    </View>
+                  )}
                 </View>
               </View>
 
@@ -255,63 +285,49 @@ const BarsListScreen: React.FC<BarsListScreenProps> = ({ navigation }) => {
                 <Text style={styles.barName} numberOfLines={1}>{bar.name}</Text>
                 
                 {/* Rating */}
-                <View style={styles.ratingContainer}>
-                  <View style={styles.starsContainer}>
-                    {renderStars(Math.round(bar.ratingAverage))}
+                {bar.ratingAverage && (
+                  <View style={styles.ratingContainer}>
+                    <View style={styles.starsContainer}>
+                      {renderStars(Math.round(bar.ratingAverage))}
+                    </View>
+                    <Text style={styles.ratingText}>
+                      ({bar.ratingQuantity || 0})
+                    </Text>
                   </View>
-                  <Text style={styles.ratingText}>
-                    ({bar.ratingQuantity})
-                  </Text>
-                </View>
+                )}
 
-                {/* Tags */}
-                {bar.tags.length > 0 && (
+                {/* Tags/Types */}
+                {bar.type && bar.type.length > 0 && (
                   <View style={styles.tagsContainer}>
-                    {bar.tags.slice(0, 3).map((tag, index) => (
+                    {bar.type.slice(0, 3).map((type, index) => (
                       <View key={index} style={styles.tag}>
-                        <Text style={styles.tagText}>{tag}</Text>
+                        <Text style={styles.tagText}>{type}</Text>
                       </View>
                     ))}
-                    {bar.tags.length > 3 && (
+                    {bar.type.length > 3 && (
                       <View style={styles.tagMore}>
-                        <Text style={styles.tagMoreText}>+{bar.tags.length - 3}</Text>
+                        <Text style={styles.tagMoreText}>+{bar.type.length - 3}</Text>
                       </View>
                     )}
                   </View>
                 )}
 
                 {/* Description */}
-                <Text style={styles.description} numberOfLines={2}>
-                  {bar.description}
-                </Text>
+                {bar.description && (
+                  <Text style={styles.description} numberOfLines={2}>
+                    {bar.description}
+                  </Text>
+                )}
 
                 {/* Location */}
-                <View style={styles.locationContainer}>
-                  <Icon name="location-on" size={16} color={colors.textMuted} />
-                  <Text style={styles.address} numberOfLines={1}>
-                    {bar.address.city}, {bar.address.state}
-                  </Text>
-                </View>
-
-                {/* Action Buttons */}
-                <View style={styles.actionButtons}>
-                  {bar.mapsUrl && (
-                    <TouchableOpacity
-                      style={styles.mapButton}
-                      onPress={(e) => {
-                        e.stopPropagation();
-                        handleMapsPress(bar.mapsUrl!);
-                      }}
-                    >
-                      <Icon name="map" size={16} color={colors.primary} />
-                      <Text style={styles.mapButtonText}>Maps</Text>
-                    </TouchableOpacity>
-                  )}
-                  <TouchableOpacity style={styles.detailsButton}>
-                    <Text style={styles.detailsButtonText}>View Details</Text>
-                    <Icon name="arrow-forward" size={16} color={colors.text} />
-                  </TouchableOpacity>
-                </View>
+                {bar.address && (
+                  <View style={styles.locationContainer}>
+                    <Icon name="location-on" size={16} color={colors.textMuted} />
+                    <Text style={styles.address} numberOfLines={1}>
+                      {[bar.address.city, bar.address.state].filter(Boolean).join(', ')}
+                    </Text>
+                  </View>
+                )}
               </View>
             </TouchableOpacity>
           ))}
@@ -357,8 +373,23 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
     textAlign: 'center',
     marginTop: 8,
+    marginBottom: 24,
+  },
+  createFirstButton: {
+    backgroundColor: colors.primary,
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 8,
+  },
+  createFirstButtonText: {
+    color: colors.text,
+    fontSize: 16,
+    fontWeight: '600',
   },
   header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     padding: 20,
     paddingBottom: 12,
     backgroundColor: colors.background,
@@ -372,6 +403,20 @@ const styles = StyleSheet.create({
   headerSubtitle: {
     fontSize: 14,
     color: colors.textSecondary,
+  },
+  addButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.primary,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 8,
+  },
+  addButtonText: {
+    color: colors.text,
+    fontWeight: '600',
+    fontSize: 14,
+    marginLeft: 6,
   },
   scrollView: {
     flex: 1,
@@ -551,7 +596,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
   },
-  mapButton: {
+  phoneButton: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: colors.surfaceVariant,
@@ -561,7 +606,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.primary,
   },
-  mapButtonText: {
+  phoneButtonText: {
     color: colors.primary,
     fontSize: 14,
     fontWeight: '600',
@@ -583,4 +628,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default BarsListScreen;
+export default BarListScreen;
