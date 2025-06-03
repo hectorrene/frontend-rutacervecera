@@ -4,6 +4,7 @@ import {
   Alert,
   Dimensions,
   Image,
+  Platform,
   RefreshControl,
   ScrollView,
   Share,
@@ -16,7 +17,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import { useAuth } from '../../../context/AuthContext';
-import barService from '../../../services/BarService'; // Ajusta la ruta según tu estructura
+import barService from '../../../services/BarService';
 
 const { width, height } = Dimensions.get('window');
 const isTablet = width >= 768;
@@ -88,40 +89,96 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
     }
   };
 
-  const handleLogout = () => {
-    Alert.alert(
-      'Sign Out',
-      'Are you sure you want to sign out?',
-      [
-        {
-          text: 'Cancel',
-          style: 'cancel',
-        },
-        {
-          text: 'Sign Out',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              setIsLoading(true);
-              await logout();
-            } catch (error) {
-              console.error('Error during logout:', error);
-              Alert.alert('Error', 'Failed to logout. Please try again.');
-            } finally {
-              setIsLoading(false);
-            }
+  // Función de confirmación de logout mejorada para desktop
+  const confirmLogout = () => {
+    if (Platform.OS === 'web' || isDesktop) {
+      // Para web/desktop, usar confirm nativo del navegador si está disponible
+      if (typeof window !== 'undefined' && window.confirm) {
+        const confirmed = window.confirm('Are you sure you want to sign out?');
+        if (confirmed) {
+          performLogout();
+        }
+      } else {
+        // Fallback para web sin confirm
+        performLogout();
+      }
+    } else {
+      // Para móvil, usar Alert de React Native
+      Alert.alert(
+        'Sign Out',
+        'Are you sure you want to sign out?',
+        [
+          {
+            text: 'Cancel',
+            style: 'cancel',
           },
-        },
-      ]
-    );
+          {
+            text: 'Sign Out',
+            style: 'destructive',
+            onPress: performLogout,
+          },
+        ]
+      );
+    }
+  };
+
+  // Función que ejecuta el logout
+  const performLogout = async () => {
+    try {
+      console.log('[ProfileScreen] Starting logout process...');
+      setIsLoading(true);
+      
+      await logout();
+      
+      console.log('[ProfileScreen] Logout completed successfully');
+      
+      // Para desktop/web, podemos mostrar un mensaje de confirmación
+      if (Platform.OS === 'web' || isDesktop) {
+        console.log('[ProfileScreen] Logout successful - redirecting...');
+      }
+      
+    } catch (error) {
+      console.error('[ProfileScreen] Error during logout:', error);
+      
+      // Manejo de errores específico para desktop
+      if (Platform.OS === 'web' || isDesktop) {
+        if (typeof window !== 'undefined' && window.alert) {
+          window.alert('Failed to logout. Please try again.');
+        } else {
+          console.error('Logout failed:', error);
+        }
+      } else {
+        Alert.alert('Error', 'Failed to logout. Please try again.');
+      }
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleShare = async () => {
     try {
-      await Share.share({
-        message: `Check out ${user?.name}'s profile on Beer Route!`,
-        title: 'Share Profile',
-      });
+      if (Platform.OS === 'web') {
+        // Para web, usar Web Share API si está disponible
+        if (navigator.share) {
+          await navigator.share({
+            title: 'Share Profile',
+            text: `Check out ${user?.name}'s profile on Beer Route!`,
+            url: window.location.href,
+          });
+        } else {
+          // Fallback para web sin Web Share API
+          const text = `Check out ${user?.name}'s profile on Beer Route!`;
+          if (navigator.clipboard) {
+            await navigator.clipboard.writeText(text);
+            console.log('Profile link copied to clipboard');
+          }
+        }
+      } else {
+        await Share.share({
+          message: `Check out ${user?.name}'s profile on Beer Route!`,
+          title: 'Share Profile',
+        });
+      }
     } catch (error) {
       console.error('Error sharing:', error);
     }
@@ -303,7 +360,7 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
           </View>
         </View>
 
-        {/* Quick Actions - Mejorado */}
+        {/* Quick Actions */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Quick Actions</Text>
           
@@ -342,19 +399,26 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
           </View>
         </View>
 
-        {/* Logout Button */}
+        {/* Logout Button - Mejorado para desktop */}
         <View style={styles.logoutContainer}>
           <TouchableOpacity
-            style={[styles.logoutButton, isLoading && styles.buttonDisabled]}
-            onPress={handleLogout}
+            style={[
+              styles.logoutButton, 
+              //isLoading && styles.buttonDisabled,
+              isDesktop && styles.logoutButtonDesktop
+            ]}
+            onPress={confirmLogout}
             disabled={isLoading}
+            activeOpacity={0.8}
           >
             {isLoading ? (
               <ActivityIndicator color={colors.text} size="small" />
             ) : (
               <>
                 <Icon name="logout" size={20} color={colors.text} />
-                <Text style={styles.logoutButtonText}>Sign Out</Text>
+                <Text style={[styles.logoutButtonText, isDesktop && styles.logoutButtonTextDesktop]}>
+                  Sign Out
+                </Text>
               </>
             )}
           </TouchableOpacity>
@@ -407,6 +471,9 @@ const styles = StyleSheet.create({
     padding: 8,
     borderWidth: 1,
     borderColor: colors.border,
+    ...(Platform.OS === 'web' && {
+      cursor: 'pointer',
+    }),
   },
   avatarSection: {
     alignItems: 'center',
@@ -533,7 +600,6 @@ const styles = StyleSheet.create({
     textAlign: 'right',
     flex: 1,
   },
-  // Nuevos estilos para Quick Actions mejorados
   quickActionsContainer: {
     gap: 12,
   },
@@ -551,6 +617,9 @@ const styles = StyleSheet.create({
     },
     shadowOpacity: 0.1,
     shadowRadius: 3,
+    ...(Platform.OS === 'web' && {
+      cursor: 'pointer',
+    }),
   },
   editProfileButton: {
     borderLeftWidth: 4,
@@ -595,14 +664,37 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
+    minHeight: 56,
+    ...(Platform.OS === 'web' && {
+      cursor: 'pointer',
+      transition: 'all 0.2s ease',
+    }),
+  },
+  logoutButtonDesktop: {
+    paddingHorizontal: 24,
+    paddingVertical: 18,
+    minHeight: 60,
+    ...(Platform.OS === 'web' && {
+      ':hover': {
+        backgroundColor: '#dc2626',
+        transform: 'translateY(-1px)',
+      },
+    }),
   },
   logoutButtonText: {
     color: colors.text,
     fontSize: 16,
     fontWeight: '600',
   },
+  logoutButtonTextDesktop: {
+    fontSize: 18,
+    fontWeight: '700',
+  },
   buttonDisabled: {
     backgroundColor: colors.textMuted,
+    ...(Platform.OS === 'web' && {
+      cursor: 'not-allowed',
+    }),
   },
 });
 

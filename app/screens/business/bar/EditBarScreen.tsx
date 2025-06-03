@@ -5,6 +5,7 @@ import {
   ActivityIndicator,
   Alert,
   KeyboardAvoidingView,
+  Modal,
   Platform,
   ScrollView,
   StyleSheet,
@@ -35,6 +36,7 @@ const colors = {
   success: '#10b981',
   warning: '#f59e0b',
   error: '#ef4444',
+  overlay: 'rgba(0, 0, 0, 0.7)',
 };
 
 type EditBarScreenRouteProp = RouteProp<BusinessStackParamList, 'EditBarScreen'>;
@@ -80,6 +82,7 @@ const EditBarScreen: React.FC<Props> = ({ route, navigation }) => {
   
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [originalBarData, setOriginalBarData] = useState<BarData | null>(null);
   const [barData, setBarData] = useState<BarData>({
     name: '',
@@ -180,31 +183,46 @@ const EditBarScreen: React.FC<Props> = ({ route, navigation }) => {
       setSaving(true);
       const response = await BusinessService.updateBar(barId, barData);
       
-      if (response.data && response.data.success) {
-        Alert.alert(
-          'Success',
-          'Bar updated successfully',
-          [
-            {
-              text: 'OK',
-              onPress: () => {
-                navigation.navigate('BusinessDetails', { 
-                  barId, 
-                  barName: barData.name 
-                });
+      if (response.status === 200 || (response.data && response.data.success)) {
+        if (Platform.OS === 'web') {
+          setShowSuccessModal(true);
+        } else {
+          Alert.alert(
+            'Success',
+            'Bar updated successfully',
+            [
+              {
+                text: 'OK',
+                onPress: () => {
+                  navigation.navigate('BusinessDetails', { 
+                    barId, 
+                    barName: barData.name 
+                  });
+                }
               }
-            }
-          ]
-        );
+            ]
+          );
+        }
       } else {
-        Alert.alert('Error', 'Failed to update bar');
+        Alert.alert('Error', response.data?.message || 'Failed to update bar');
       }
     } catch (error) {
       console.error('Error updating bar:', error);
-      Alert.alert('Error', 'Could not update bar');
+      Alert.alert(
+        'Error', 
+        error instanceof Error ? error.message : 'Could not update bar'
+      );
     } finally {
       setSaving(false);
     }
+  };
+
+  const handleSuccessModalClose = () => {
+    setShowSuccessModal(false);
+    navigation.navigate('BusinessDetails', { 
+      barId, 
+      barName: barData.name 
+    });
   };
 
   const handleTagToggle = (tag: string) => {
@@ -225,6 +243,38 @@ const EditBarScreen: React.FC<Props> = ({ route, navigation }) => {
       }
     }));
   };
+
+  const renderSuccessModal = () => (
+    <Modal
+      visible={showSuccessModal}
+      transparent={true}
+      animationType="fade"
+      onRequestClose={handleSuccessModalClose}
+    >
+      <View style={styles.modalOverlay}>
+        <View style={styles.modalContainer}>
+          <View style={styles.modalHeader}>
+            <View style={styles.successIconContainer}>
+              <Icon name="check-circle" size={48} color={colors.success} />
+            </View>
+            <Text style={styles.modalTitle}>Bar Updated Successfully!</Text>
+            <Text style={styles.modalMessage}>
+              Your bar "{barData.name}" has been updated with the latest information.
+            </Text>
+          </View>
+          
+          <View style={styles.modalActions}>
+            <TouchableOpacity
+              style={styles.modalButton}
+              onPress={handleSuccessModalClose}
+            >
+              <Text style={styles.modalButtonText}>Continue</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </View>
+    </Modal>
+  );
 
   if (loading) {
     return (
@@ -249,17 +299,18 @@ const EditBarScreen: React.FC<Props> = ({ route, navigation }) => {
           <Icon name="arrow-back" size={24} color={colors.text} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Edit Bar</Text>
-        <TouchableOpacity 
-          style={[styles.saveButton, saving && styles.saveButtonDisabled]}
-          onPress={handleSave}
-          disabled={saving}
-        >
-          {saving ? (
-            <ActivityIndicator size="small" color={colors.text} />
-          ) : (
-            <Text style={styles.saveButtonText}>Save</Text>
-          )}
-        </TouchableOpacity>
+        <View style={styles.headerActions}>          <TouchableOpacity 
+            style={[styles.saveButton, saving && styles.saveButtonDisabled]}
+            onPress={handleSave}
+            disabled={saving}
+          >
+            {saving ? (
+              <ActivityIndicator size="small" color={colors.text} />
+            ) : (
+              <Text style={styles.saveButtonText}>Save</Text>
+            )}
+          </TouchableOpacity>
+        </View>
       </View>
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
@@ -413,6 +464,9 @@ const EditBarScreen: React.FC<Props> = ({ route, navigation }) => {
 
         <View style={styles.bottomPadding} />
       </ScrollView>
+
+      {/* Success Modal for Desktop */}
+      {renderSuccessModal()}
     </KeyboardAvoidingView>
   );
 };
@@ -453,6 +507,10 @@ const styles = StyleSheet.create({
     flex: 1,
     textAlign: 'center',
     marginHorizontal: 16,
+  },
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   saveButton: {
     backgroundColor: colors.primary,
@@ -555,6 +613,66 @@ const styles = StyleSheet.create({
   },
   bottomPadding: {
     height: 50,
+  },
+  // Modal Styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: colors.overlay,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  modalContainer: {
+    backgroundColor: colors.surface,
+    borderRadius: 16,
+    padding: 24,
+    width: '100%',
+    maxWidth: 400,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 10,
+    },
+    shadowOpacity: 0.3,
+    shadowRadius: 20,
+    elevation: 10,
+  },
+  modalHeader: {
+    alignItems: 'center',
+    marginBottom: 24,
+  },
+  successIconContainer: {
+    marginBottom: 16,
+  },
+  modalTitle: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: colors.text,
+    textAlign: 'center',
+    marginBottom: 12,
+  },
+  modalMessage: {
+    fontSize: 16,
+    color: colors.textSecondary,
+    textAlign: 'center',
+    lineHeight: 22,
+  },
+  modalActions: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+  },
+  modalButton: {
+    backgroundColor: colors.primary,
+    paddingVertical: 12,
+    paddingHorizontal: 32,
+    borderRadius: 12,
+    minWidth: 120,
+    alignItems: 'center',
+  },
+  modalButtonText: {
+    color: colors.text,
+    fontSize: 16,
+    fontWeight: '600',
   },
 });
 

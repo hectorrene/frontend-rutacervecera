@@ -171,6 +171,19 @@ class BusinessService {
     }
   }
 
+  // Obtener un evento específico del usuario
+async getEvent(barId: string, eventId: string): Promise<AxiosResponse> {
+  try {
+    const userId = getCurrentUserGlobal()?._id;
+    if (!userId) throw new Error('User not authenticated');
+    
+    return await this.api.get(`/bars/owner/${userId}/${barId}/events/${eventId}`);
+  } catch (error) {
+    HandleLoginError(error);
+    throw error;
+  }
+}
+
   // Actualizar un evento
   async updateEvent(barId: string, eventId: string, eventData: any): Promise<AxiosResponse> {
     try {

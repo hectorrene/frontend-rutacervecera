@@ -1,3 +1,4 @@
+import DateTimePicker from '@react-native-community/datetimepicker';
 import { LinearGradient } from 'expo-linear-gradient';
 import React, { useEffect, useRef, useState } from 'react';
 import {
@@ -7,6 +8,7 @@ import {
   Dimensions,
   ImageBackground,
   KeyboardAvoidingView,
+  Modal,
   Platform,
   ScrollView,
   StatusBar,
@@ -24,6 +26,7 @@ import { RegisterData } from '../../../services/AuthService';
 const { width, height } = Dimensions.get('window');
 const isTablet = width >= 768;
 const isDesktop = width >= 1024;
+const isWeb = Platform.OS === 'web';
 
 // Dark theme colors - matching login screen
 const colors = {
@@ -49,6 +52,7 @@ const colors = {
   overlay: 'rgba(0, 0, 0, 0.7)',
   gradientStart: 'rgba(59, 130, 246, 0.8)',
   gradientEnd: 'rgba(139, 92, 246, 0.8)',
+  modalBackground: 'rgba(0, 0, 0, 0.8)',
 };
 
 interface RegisterScreenProps {
@@ -58,6 +62,79 @@ interface RegisterScreenProps {
 interface ExtendedRegisterData extends RegisterData {
   photo?: string;
 }
+
+// Universal DatePicker Component
+const UniversalDatePicker: React.FC<{
+  isVisible: boolean;
+  date: Date;
+  onConfirm: (date: Date) => void;
+  onCancel: () => void;
+  maximumDate?: Date;
+}> = ({ isVisible, date, onConfirm, onCancel, maximumDate }) => {
+  const [tempDate, setTempDate] = useState(date);
+
+  if (!isVisible) return null;
+
+  if (isWeb || Platform.OS === 'web') {
+    // Web version with HTML input
+    return (
+      <Modal
+        visible={isVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={onCancel}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.webDatePickerContainer}>
+            <Text style={styles.webDatePickerTitle}>
+              Seleccionar Fecha de Nacimiento
+            </Text>
+            <input
+              type="date"
+              value={tempDate.toISOString().split('T')[0]}
+              max={maximumDate ? maximumDate.toISOString().split('T')[0] : undefined}
+              onChange={(e) => {
+                const newDate = new Date(e.target.value);
+                setTempDate(newDate);
+              }}
+              style={styles.webDateInput}
+            />
+            <View style={styles.webDatePickerButtons}>
+              <TouchableOpacity style={styles.webDatePickerButton} onPress={onCancel}>
+                <Text style={styles.webDatePickerButtonText}>Cancelar</Text>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={[styles.webDatePickerButton, styles.webDatePickerConfirmButton]} 
+                onPress={() => onConfirm(tempDate)}
+              >
+                <Text style={[styles.webDatePickerButtonText, styles.webDatePickerConfirmText]}>
+                  Confirmar
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+    );
+  }
+
+  // Mobile version with native DateTimePicker
+  return (
+    <DateTimePicker
+      value={tempDate}
+      mode="date"
+      display="default"
+      maximumDate={maximumDate}
+      onChange={(event, selectedDate) => {
+        if (selectedDate) {
+          onConfirm(selectedDate);
+        } else {
+          onCancel();
+        }
+      }}
+    />
+  );
+};
 
 const RegisterScreen: React.FC<RegisterScreenProps> = ({ navigation }) => {
   const { register } = useAuth();
@@ -77,8 +154,8 @@ const RegisterScreen: React.FC<RegisterScreenProps> = ({ navigation }) => {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
-  // Date picker state for desktop compatibility
-  const [dateInput, setDateInput] = useState('');
+  // DatePicker state
+  const [showDatePicker, setShowDatePicker] = useState(false);
 
   // Animations
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -204,33 +281,14 @@ const RegisterScreen: React.FC<RegisterScreenProps> = ({ navigation }) => {
     }
   };
 
-  const handleDateInputChange = (value: string) => {
-    setDateInput(value);
+  const handleDateSelect = (selectedDate: Date) => {
+    const isoString = selectedDate.toISOString().split('T')[0];
+    setFormData({ ...formData, birthDate: isoString });
     
-    // Try to parse the date in various formats
-    let parsedDate: Date | null = null;
-    
-    // Try DD/MM/YYYY format
-    const ddmmyyyy = value.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
-    if (ddmmyyyy) {
-      const [, day, month, year] = ddmmyyyy;
-      parsedDate = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+    if (errors.birthDate) {
+      setErrors({ ...errors, birthDate: undefined });
     }
-    
-    // Try YYYY-MM-DD format
-    const yyyymmdd = value.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
-    if (yyyymmdd) {
-      parsedDate = new Date(value);
-    }
-    
-    if (parsedDate && !isNaN(parsedDate.getTime())) {
-      const isoString = parsedDate.toISOString().split('T')[0];
-      setFormData({ ...formData, birthDate: isoString });
-      
-      if (errors.birthDate) {
-        setErrors({ ...errors, birthDate: undefined });
-      }
-    }
+    setShowDatePicker(false);
   };
 
   const formatDateForDisplay = (dateString: string): string => {
@@ -238,6 +296,13 @@ const RegisterScreen: React.FC<RegisterScreenProps> = ({ navigation }) => {
     const date = new Date(dateString);
     if (isNaN(date.getTime())) return dateString;
     return date.toLocaleDateString('es-ES');
+  };
+
+  // Calculate maximum date (18 years ago)
+  const getMaximumDate = (): Date => {
+    const today = new Date();
+    today.setFullYear(today.getFullYear() - 18);
+    return today;
   };
 
   return (
@@ -374,25 +439,27 @@ const RegisterScreen: React.FC<RegisterScreenProps> = ({ navigation }) => {
                     {errors.phone && <Text style={styles.errorText}>{errors.phone}</Text>}
                   </View>
 
-                  {/* Birth Date Input - Desktop Compatible */}
+                  {/* Birth Date Input with DatePicker */}
                   <View style={styles.inputContainer}>
                     <Text style={styles.label}>Fecha de Nacimiento</Text>
-                    <View style={[
-                      styles.inputWrapper,
-                      focusedField === 'birthDate' && styles.inputWrapperFocused,
-                      errors.birthDate && styles.inputWrapperError
-                    ]}>
+                    <TouchableOpacity
+                      style={[
+                        styles.inputWrapper,
+                        styles.datePickerButton,
+                        focusedField === 'birthDate' && styles.inputWrapperFocused,
+                        errors.birthDate && styles.inputWrapperError
+                      ]}
+                      onPress={() => setShowDatePicker(true)}
+                    >
                       <Icon name="cake" size={20} color={colors.textMuted} style={styles.inputIcon} />
-                      <TextInput
-                        style={styles.input}
-                        value={dateInput || formatDateForDisplay(formData.birthDate)}
-                        onChangeText={handleDateInputChange}
-                        placeholder="DD/MM/AAAA o AAAA-MM-DD"
-                        placeholderTextColor={colors.textMuted}
-                        onFocus={() => setFocusedField('birthDate')}
-                        onBlur={() => setFocusedField(null)}
-                      />
-                    </View>
+                      <Text style={[
+                        styles.datePickerText,
+                        !formData.birthDate && styles.datePickerPlaceholder
+                      ]}>
+                        {formData.birthDate ? formatDateForDisplay(formData.birthDate) : 'Selecciona tu fecha de nacimiento'}
+                      </Text>
+                      <Icon name="calendar-today" size={20} color={colors.primary} />
+                    </TouchableOpacity>
                     <Text style={styles.helperText}>Debes ser mayor de 18 años</Text>
                     {errors.birthDate && <Text style={styles.errorText}>{errors.birthDate}</Text>}
                   </View>
@@ -579,6 +646,15 @@ const RegisterScreen: React.FC<RegisterScreenProps> = ({ navigation }) => {
           </KeyboardAvoidingView>
         </SafeAreaView>
       </ImageBackground>
+
+      {/* Universal DatePicker */}
+      <UniversalDatePicker
+        isVisible={showDatePicker}
+        date={formData.birthDate ? new Date(formData.birthDate) : new Date(1990, 0, 1)}
+        maximumDate={getMaximumDate()}
+        onConfirm={handleDateSelect}
+        onCancel={() => setShowDatePicker(false)}
+      />
     </View>
   );
 };
@@ -729,6 +805,19 @@ const styles = StyleSheet.create({
     marginTop: 6,
     marginLeft: 4,
   },
+  // DatePicker specific styles
+  datePickerButton: {
+    justifyContent: 'space-between',
+  },
+  datePickerText: {
+    fontSize: 16,
+    color: colors.text,
+    flex: 1,
+  },
+  datePickerPlaceholder: {
+    color: colors.textMuted,
+  },
+  // Account Type specific styles
   accountTypeContainer: {
     flexDirection: 'row',
     gap: 12,
@@ -742,8 +831,8 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     borderWidth: 1,
     borderColor: colors.inputBorder,
-    paddingVertical: 12,
-    paddingHorizontal: 16,
+    paddingVertical: 16,
+    paddingHorizontal: 12,
     gap: 8,
   },
   accountTypeButtonActive: {
@@ -751,7 +840,7 @@ const styles = StyleSheet.create({
     borderColor: colors.primary,
   },
   accountTypeText: {
-    fontSize: 14,
+    fontSize: 16,
     color: colors.textMuted,
     fontWeight: '500',
   },
@@ -759,40 +848,120 @@ const styles = StyleSheet.create({
     color: colors.text,
     fontWeight: '600',
   },
+  // Register Button styles
   registerButton: {
+    marginTop: 24,
+    marginBottom: 16,
     borderRadius: 12,
     overflow: 'hidden',
-    marginTop: 8,
-    marginBottom: 24,
   },
   buttonGradient: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 16,
-    paddingHorizontal: 24,
     gap: 8,
+  },
+  buttonText: {
+    color: colors.text,
+    fontSize: 18,
+    fontWeight: '600',
   },
   buttonDisabled: {
     opacity: 0.6,
   },
-  buttonText: {
-    color: colors.text,
-    fontSize: 16,
-    fontWeight: '600',
-  },
+  // Link styles
   linkContainer: {
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
+    marginTop: 8,
   },
   linkText: {
-    fontSize: 16,
     color: colors.textSecondary,
+    fontSize: 16,
   },
   link: {
-    fontSize: 16,
     color: colors.primary,
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  // Modal and Web DatePicker styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: colors.modalBackground,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+  },
+  webDatePickerContainer: {
+    backgroundColor: colors.surface,
+    borderRadius: 16,
+    padding: 24,
+    width: '100%',
+    maxWidth: 320,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: colors.border,
+    ...Platform.select({
+      web: {
+        boxShadow: '0 8px 32px rgba(0, 0, 0, 0.5)',
+      },
+    }),
+  },
+  webDatePickerTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: colors.text,
+    marginBottom: 20,
+    textAlign: 'center',
+  },
+  webDateInput: {
+    width: '100%',
+    padding: 12,
+    backgroundColor: colors.inputBackground,
+    borderRadius: 8,
+    fontSize: 16,
+    color: colors.text,
+    marginBottom: 20,
+    outline: 'none',
+    fontFamily: 'inherit',
+    ...Platform.select({
+      web: {
+        '&:focus': {
+          borderColor: colors.inputFocused,
+          backgroundColor: colors.surfaceVariant,
+        },
+      },
+    }),
+  },
+  webDatePickerButtons: {
+    flexDirection: 'row',
+    gap: 12,
+    width: '100%',
+  },
+  webDatePickerButton: {
+    flex: 1,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    backgroundColor: colors.surfaceVariant,
+    borderWidth: 1,
+    borderColor: colors.border,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  webDatePickerConfirmButton: {
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
+  },
+  webDatePickerButtonText: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: colors.textSecondary,
+  },
+  webDatePickerConfirmText: {
+    color: colors.text,
     fontWeight: '600',
   },
 });
