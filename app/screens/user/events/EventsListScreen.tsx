@@ -1,18 +1,18 @@
 import { StackNavigationProp } from '@react-navigation/stack';
 import React, { useEffect, useState } from 'react';
 import {
-    ActivityIndicator,
-    Dimensions,
-    FlatList,
-    Image,
-    Platform,
-    RefreshControl,
-    ScrollView,
-    StatusBar,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View
+  ActivityIndicator,
+  Dimensions,
+  FlatList,
+  Image,
+  Platform,
+  RefreshControl,
+  ScrollView,
+  StatusBar,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/MaterialIcons';
@@ -71,13 +71,16 @@ const EventsScreen: React.FC<EventsScreenProps> = ({ navigation }) => {
   const [events, setEvents] = useState<Event[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [activeFilter, setActiveFilter] = useState<'all' | 'upcoming' | 'today' | 'weekend'>('all');
+  const [activeFilter, setActiveFilter] = useState<'all' | 'today' | 'next_week' | 'next_month'>('all');
 
   const fetchEvents = async () => {
     try {
       setLoading(true);
       const response = await BarService.getAllEvents();
-      setEvents(response.data);
+      // Filter out past events - only show future events
+      const now = new Date();
+      const futureEvents = response.data.filter((event: Event) => new Date(event.start) > now);
+      setEvents(futureEvents);
     } catch (error) {
       console.error('Error loading events:', error);
     } finally {
@@ -97,7 +100,8 @@ const EventsScreen: React.FC<EventsScreenProps> = ({ navigation }) => {
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
-    return date.toLocaleDateString('en-US', { 
+    return date.toLocaleDateString('es-ES', { 
+      weekday: 'short',
       month: 'short', 
       day: 'numeric' 
     });
@@ -105,7 +109,7 @@ const EventsScreen: React.FC<EventsScreenProps> = ({ navigation }) => {
 
   const formatTime = (dateString: string) => {
     const date = new Date(dateString);
-    return date.toLocaleTimeString('en-US', { 
+    return date.toLocaleTimeString('es-ES', { 
       hour: '2-digit', 
       minute: '2-digit' 
     });
@@ -114,28 +118,25 @@ const EventsScreen: React.FC<EventsScreenProps> = ({ navigation }) => {
   const getFilteredEvents = () => {
     const now = new Date();
     const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    const weekend = new Date(now);
-    weekend.setDate(now.getDate() + (6 - now.getDay()));
+    const nextWeek = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+    const nextMonth = new Date(now.getFullYear(), now.getMonth() + 1, now.getDate());
 
     switch (activeFilter) {
-      case 'upcoming':
-        return events.filter(event => new Date(event.start) > now);
       case 'today':
         return events.filter(event => {
           const eventDate = new Date(event.start);
-          return eventDate.getDate() === today.getDate() && 
-                 eventDate.getMonth() === today.getMonth() && 
-                 eventDate.getFullYear() === today.getFullYear();
+          const eventDay = new Date(eventDate.getFullYear(), eventDate.getMonth(), eventDate.getDate());
+          return eventDay.getTime() === today.getTime();
         });
-      case 'weekend':
-        const weekendStart = new Date(now);
-        weekendStart.setDate(now.getDate() + (5 - now.getDay()));
-        const weekendEnd = new Date(now);
-        weekendEnd.setDate(now.getDate() + (7 - now.getDay()));
-        
+      case 'next_week':
         return events.filter(event => {
           const eventDate = new Date(event.start);
-          return eventDate >= weekendStart && eventDate <= weekendEnd;
+          return eventDate >= now && eventDate <= nextWeek;
+        });
+      case 'next_month':
+        return events.filter(event => {
+          const eventDate = new Date(event.start);
+          return eventDate >= now && eventDate <= nextMonth;
         });
       default:
         return events;
@@ -146,9 +147,9 @@ const EventsScreen: React.FC<EventsScreenProps> = ({ navigation }) => {
 
   const getCardWidth = () => {
     if (isDesktop) {
-      return (width - 64) / 3 - 16; // 3 columns on desktop
+      return (width - 80) / 3 - 16; // 3 columns on desktop with better spacing
     } else if (isTablet) {
-      return (width - 48) / 2 - 12; // 2 columns on tablet
+      return (width - 60) / 2 - 16; // 2 columns on tablet with better spacing
     }
     return width - 32; // Full width on mobile
   };
@@ -166,33 +167,46 @@ const EventsScreen: React.FC<EventsScreenProps> = ({ navigation }) => {
     >
       <View style={styles.imageContainer}>
         <Image
-          source={{ uri: item.image || 'https://via.placeholder.com/400x200?text=No+Image' }}
+          source={{ uri: item.image || 'https://via.placeholder.com/400x240?text=No+Image' }}
           style={styles.eventImage}
           resizeMode="cover"
         />
         <View style={styles.priceTag}>
           <Text style={styles.priceText}>
-            {item.price > 0 ? `$${item.price.toFixed(2)}` : 'Free'}
+            {item.price > 0 ? `$${item.price.toFixed(2)}` : 'Gratis'}
           </Text>
+        </View>
+        <View style={styles.dateOverlay}>
+          <Text style={styles.dateText}>{formatDate(item.start)}</Text>
         </View>
       </View>
       
       <View style={styles.eventContent}>
-        <Text style={styles.eventName} numberOfLines={1}>{item.name}</Text>
-        <Text style={styles.barName} numberOfLines={1}>{item.bar?.name || "Bar name not available"}</Text>
+        <Text style={styles.eventName} numberOfLines={2}>
+          {item.name || "Evento sin nombre"}
+        </Text>
+        
+        <View style={styles.barContainer}>
+          <Icon name="store" size={16} color={colors.primary} />
+          <Text style={styles.barName} numberOfLines={1}>
+            {item.bar?.name || "Bar no disponible"}
+          </Text>
+        </View>
         
         <View style={styles.eventDetails}>
           <View style={styles.detailRow}>
-            <Icon name="event" size={16} color={colors.primary} style={styles.detailIcon} />
+            <Icon name="schedule" size={16} color={colors.accent} style={styles.detailIcon} />
             <Text style={styles.detailText}>
-              {formatDate(item.start)} {formatTime(item.start)}
+              {formatTime(item.start)}
             </Text>
           </View>
           
-          <View style={styles.detailRow}>
-            <Icon name="location-on" size={16} color={colors.accent} style={styles.detailIcon} />
-            <Text style={styles.detailText} numberOfLines={1}>{item.location}</Text>
-          </View>
+          {item.location && (
+            <View style={styles.detailRow}>
+              <Icon name="location-on" size={16} color={colors.secondary} style={styles.detailIcon} />
+              <Text style={styles.detailText} numberOfLines={1}>{item.location}</Text>
+            </View>
+          )}
         </View>
       </View>
     </TouchableOpacity>
@@ -202,7 +216,7 @@ const EventsScreen: React.FC<EventsScreenProps> = ({ navigation }) => {
     <View style={styles.header}>
       <Text style={styles.headerTitle}>Eventos</Text>
       <Text style={styles.headerSubtitle}>
-        {filteredEvents.length} {filteredEvents.length === 1 ? 'evento' : 'eventos'} encontrados
+        {filteredEvents.length} {filteredEvents.length === 1 ? 'evento próximo' : 'eventos próximos'}
       </Text>
     </View>
   );
@@ -218,17 +232,9 @@ const EventsScreen: React.FC<EventsScreenProps> = ({ navigation }) => {
           style={[styles.filterButton, activeFilter === 'all' && styles.activeFilterButton]}
           onPress={() => setActiveFilter('all')}
         >
+          <Icon name="event" size={16} color={activeFilter === 'all' ? colors.text : colors.textSecondary} style={styles.filterIcon} />
           <Text style={[styles.filterText, activeFilter === 'all' && styles.activeFilterText]}>
             Todos
-          </Text>
-        </TouchableOpacity>
-        
-        <TouchableOpacity 
-          style={[styles.filterButton, activeFilter === 'upcoming' && styles.activeFilterButton]}
-          onPress={() => setActiveFilter('upcoming')}
-        >
-          <Text style={[styles.filterText, activeFilter === 'upcoming' && styles.activeFilterText]}>
-            Próximos
           </Text>
         </TouchableOpacity>
         
@@ -236,17 +242,29 @@ const EventsScreen: React.FC<EventsScreenProps> = ({ navigation }) => {
           style={[styles.filterButton, activeFilter === 'today' && styles.activeFilterButton]}
           onPress={() => setActiveFilter('today')}
         >
+          <Icon name="today" size={16} color={activeFilter === 'today' ? colors.text : colors.textSecondary} style={styles.filterIcon} />
           <Text style={[styles.filterText, activeFilter === 'today' && styles.activeFilterText]}>
             Hoy
           </Text>
         </TouchableOpacity>
         
         <TouchableOpacity 
-          style={[styles.filterButton, activeFilter === 'weekend' && styles.activeFilterButton]}
-          onPress={() => setActiveFilter('weekend')}
+          style={[styles.filterButton, activeFilter === 'next_week' && styles.activeFilterButton]}
+          onPress={() => setActiveFilter('next_week')}
         >
-          <Text style={[styles.filterText, activeFilter === 'weekend' && styles.activeFilterText]}>
-            Fin de semana
+          <Icon name="date-range" size={16} color={activeFilter === 'next_week' ? colors.text : colors.textSecondary} style={styles.filterIcon} />
+          <Text style={[styles.filterText, activeFilter === 'next_week' && styles.activeFilterText]}>
+            Esta semana
+          </Text>
+        </TouchableOpacity>
+        
+        <TouchableOpacity 
+          style={[styles.filterButton, activeFilter === 'next_month' && styles.activeFilterButton]}
+          onPress={() => setActiveFilter('next_month')}
+        >
+          <Icon name="calendar-month" size={16} color={activeFilter === 'next_month' ? colors.text : colors.textSecondary} style={styles.filterIcon} />
+          <Text style={[styles.filterText, activeFilter === 'next_month' && styles.activeFilterText]}>
+            Este mes
           </Text>
         </TouchableOpacity>
       </ScrollView>
@@ -255,12 +273,12 @@ const EventsScreen: React.FC<EventsScreenProps> = ({ navigation }) => {
 
   const renderEmptyState = () => (
     <View style={styles.emptyContainer}>
-      <Icon name="event-busy" size={64} color={colors.textMuted} />
+      <Icon name="event-busy" size={80} color={colors.textMuted} />
       <Text style={styles.emptyTitle}>No hay eventos disponibles</Text>
       <Text style={styles.emptySubtitle}>
         {activeFilter !== 'all' 
-          ? 'Prueba con otro filtro o vuelve más tarde' 
-          : 'Vuelve a revisar más tarde para ver nuevos eventos'}
+          ? 'Prueba con otro filtro para ver más eventos' 
+          : 'No hay eventos programados por el momento.\nVuelve a revisar más tarde.'}
       </Text>
       {activeFilter !== 'all' && (
         <TouchableOpacity 
@@ -299,7 +317,7 @@ const EventsScreen: React.FC<EventsScreenProps> = ({ navigation }) => {
             isTablet && !isDesktop && styles.tabletGrid
           ]}
           numColumns={isDesktop ? 3 : isTablet ? 2 : 1}
-          key={isDesktop ? 'desktop' : isTablet ? 'tablet' : 'mobile'}
+          key={isDesktop ? 'desktop-3' : isTablet ? 'tablet-2' : 'mobile-1'}
           refreshControl={
             <RefreshControl 
               refreshing={refreshing} 
@@ -308,6 +326,7 @@ const EventsScreen: React.FC<EventsScreenProps> = ({ navigation }) => {
               colors={[colors.primary]}
             />
           }
+          ItemSeparatorComponent={() => <View style={{ height: 16 }} />}
         />
       )}
     </SafeAreaView>
@@ -321,37 +340,44 @@ const styles = StyleSheet.create({
   },
   header: {
     padding: 20,
-    paddingBottom: 12,
+    paddingBottom: 16,
   },
   headerTitle: {
-    fontSize: 28,
+    fontSize: 32,
     fontWeight: 'bold',
     color: colors.text,
-    marginBottom: 4,
+    marginBottom: 6,
   },
   headerSubtitle: {
-    fontSize: 14,
+    fontSize: 16,
     color: colors.textSecondary,
+    fontWeight: '500',
   },
   filtersContainer: {
     paddingHorizontal: 20,
-    marginBottom: 16,
+    marginBottom: 20,
   },
   filtersScrollContent: {
     paddingRight: 20,
   },
   filterButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
     paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
+    paddingVertical: 10,
+    borderRadius: 25,
     backgroundColor: colors.surface,
-    marginRight: 8,
+    marginRight: 12,
     borderWidth: 1,
     borderColor: colors.border,
+    minHeight: 40,
   },
   activeFilterButton: {
     backgroundColor: colors.primary,
     borderColor: colors.primary,
+  },
+  filterIcon: {
+    marginRight: 6,
   },
   filterText: {
     fontSize: 14,
@@ -377,35 +403,37 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 32,
+    padding: 40,
   },
   emptyTitle: {
-    fontSize: 20,
+    fontSize: 22,
     fontWeight: 'bold',
     color: colors.text,
-    marginTop: 16,
-    marginBottom: 8,
+    marginTop: 20,
+    marginBottom: 12,
+    textAlign: 'center',
   },
   emptySubtitle: {
-    fontSize: 14,
+    fontSize: 16,
     color: colors.textMuted,
     textAlign: 'center',
-    marginBottom: 24,
+    marginBottom: 30,
+    lineHeight: 22,
   },
   resetButton: {
     backgroundColor: colors.primary,
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    borderRadius: 8,
+    paddingHorizontal: 24,
+    paddingVertical: 14,
+    borderRadius: 12,
   },
   resetButtonText: {
     color: colors.text,
-    fontSize: 14,
+    fontSize: 16,
     fontWeight: '600',
   },
   listContent: {
-    padding: 16,
-    paddingBottom: 32,
+    padding: 20,
+    paddingBottom: 40,
   },
   desktopGrid: {
     flexDirection: 'row',
@@ -419,7 +447,7 @@ const styles = StyleSheet.create({
   },
   eventCard: {
     backgroundColor: colors.surface,
-    borderRadius: 16,
+    borderRadius: 20,
     marginBottom: 20,
     overflow: 'hidden',
     borderWidth: 1,
@@ -427,12 +455,12 @@ const styles = StyleSheet.create({
     ...Platform.select({
       ios: {
         shadowColor: '#000',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.3,
-        shadowRadius: 8,
+        shadowOffset: { width: 0, height: 6 },
+        shadowOpacity: 0.25,
+        shadowRadius: 12,
       },
       android: {
-        elevation: 8,
+        elevation: 10,
       },
     }),
   },
@@ -447,51 +475,79 @@ const styles = StyleSheet.create({
   },
   eventImage: {
     width: '100%',
-    height: 160,
+    height: 180,
   },
   priceTag: {
     position: 'absolute',
-    top: 12,
-    right: 12,
+    top: 16,
+    right: 16,
     backgroundColor: 'rgba(0, 0, 0, 0.8)',
     paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
   },
   priceText: {
     color: colors.text,
     fontSize: 14,
+    fontWeight: '700',
+  },
+  dateOverlay: {
+    position: 'absolute',
+    bottom: 16,
+    left: 16,
+    backgroundColor: colors.primary,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+  },
+  dateText: {
+    color: colors.text,
+    fontSize: 12,
     fontWeight: '600',
+    textTransform: 'capitalize',
   },
   eventContent: {
-    padding: 16,
+    padding: 20,
   },
   eventName: {
-    fontSize: 18,
+    fontSize: 22,
     fontWeight: 'bold',
     color: colors.text,
-    marginBottom: 4,
+    marginBottom: 12,
+    lineHeight: 28,
+    textAlign: 'left',
+  },
+  barContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 16,
+    backgroundColor: colors.surfaceVariant,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 12,
   },
   barName: {
-    fontSize: 14,
-    color: colors.primary,
-    marginBottom: 12,
-    fontWeight: '500',
+    fontSize: 15,
+    color: colors.text,
+    marginLeft: 8,
+    fontWeight: '600',
+    flex: 1,
   },
   eventDetails: {
-    gap: 8,
+    gap: 12,
   },
   detailRow: {
     flexDirection: 'row',
     alignItems: 'center',
   },
   detailIcon: {
-    marginRight: 8,
+    marginRight: 10,
   },
   detailText: {
     fontSize: 14,
     color: colors.textSecondary,
     flex: 1,
+    fontWeight: '500',
   },
 });
 

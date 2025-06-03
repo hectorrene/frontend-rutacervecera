@@ -160,7 +160,7 @@ const BarsListScreen: React.FC<BarsListScreenProps> = ({ navigation }) => {
             <Icon name="search" size={20} color={colors.textMuted} style={styles.searchIcon} />
             <TextInput
               style={styles.searchInput}
-              placeholder="Search bars, tags, or cities..."
+              placeholder="Search bars...."
               placeholderTextColor={colors.textMuted}
               value={searchQuery}
               onChangeText={setSearchQuery}
@@ -197,7 +197,7 @@ const BarsListScreen: React.FC<BarsListScreenProps> = ({ navigation }) => {
           <Icon name="search" size={20} color={colors.textMuted} style={styles.searchIcon} />
           <TextInput
             style={styles.searchInput}
-            placeholder="Search bars, tags, or cities..."
+            placeholder="Search bars...."
             placeholderTextColor={colors.textMuted}
             value={searchQuery}
             onChangeText={setSearchQuery}
@@ -307,7 +307,13 @@ const BarsListScreen: React.FC<BarsListScreenProps> = ({ navigation }) => {
                       <Text style={styles.mapButtonText}>Maps</Text>
                     </TouchableOpacity>
                   )}
-                  <TouchableOpacity style={styles.detailsButton}>
+                  <TouchableOpacity 
+                    style={styles.detailsButton}
+                    onPress={(e) => {
+                        e.stopPropagation();
+                        handleBarPress(bar._id);
+                      }}
+                  >
                     <Text style={styles.detailsButtonText}>View Details</Text>
                     <Icon name="arrow-forward" size={16} color={colors.text} />
                   </TouchableOpacity>

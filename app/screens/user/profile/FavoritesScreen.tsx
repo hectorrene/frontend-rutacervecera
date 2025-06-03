@@ -1,20 +1,20 @@
 import React, { useEffect, useState } from 'react';
 import {
-    ActivityIndicator,
-    Alert,
-    Dimensions,
-    FlatList,
-    Image,
-    RefreshControl,
-    StatusBar,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View
+  ActivityIndicator,
+  Alert,
+  Dimensions,
+  FlatList,
+  Image,
+  RefreshControl,
+  StatusBar,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/MaterialIcons';
-import AuthService from '../../../services/AuthService';
+import { authService } from '../../../services/AuthService'; // Import the singleton instance
 import BarService from '../../../services/BarService';
 
 const { width, height } = Dimensions.get('window');
@@ -68,7 +68,7 @@ const FavoritesScreen = ({ navigation }: { navigation: any }) => {
 
   const fetchFavorites = async () => {
     try {
-      const userId = AuthService.getCurrentUser()?._id;
+      const userId = authService.getCurrentUser()?._id; // Use the singleton instance
       if (!userId) {
         throw new Error('User ID is undefined');
       }
@@ -170,10 +170,9 @@ const FavoritesScreen = ({ navigation }: { navigation: any }) => {
         <Text style={styles.emptyText}>No favorites yet</Text>
         <Text style={styles.emptySubtext}>
           Tap the heart icon on bars to add them to your favorites
-        </Text>
-        <TouchableOpacity 
+        </Text>        <TouchableOpacity 
           style={styles.exploreButton}
-          onPress={() => navigation.navigate('Bars')}
+          onPress={() => navigation.navigate('BarsTab')}
         >
           <Text style={styles.exploreButtonText}>Explore Bars</Text>
         </TouchableOpacity>

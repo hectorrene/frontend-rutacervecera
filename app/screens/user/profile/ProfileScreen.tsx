@@ -16,6 +16,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import { useAuth } from '../../../context/AuthContext';
+import barService from '../../../services/BarService'; // Ajusta la ruta según tu estructura
 
 const { width, height } = Dimensions.get('window');
 const isTablet = width >= 768;
@@ -50,15 +51,15 @@ interface ProfileScreenProps {
 
 const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
   const { user, logout } = useAuth();
-    //const { user, logout, refreshProfile } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [reviewCount, setReviewCount] = useState(0);
 
   useEffect(() => {
     console.log('[ProfileScreen] useEffect - user:', user);
     if (user) {
-      console.log('[ProfileScreen] Calling refreshProfile');
-      //refreshProfile();
+      console.log('[ProfileScreen] Loading user data');
+      fetchUserReviewCount();
     }
   }, []);
 
@@ -66,10 +67,20 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
     console.log('[ProfileScreen] user changed:', user);
   }, [user]);
 
+  const fetchUserReviewCount = async () => {
+    try {
+      const response = await barService.getUserReviewCount();
+      setReviewCount(response.data.count);
+    } catch (error) {
+      console.error('Error fetching review count:', error);
+      setReviewCount(0);
+    }
+  };
+
   const onRefresh = async () => {
     setRefreshing(true);
     try {
-      //await //refreshProfile();
+      await fetchUserReviewCount();
     } catch (error) {
       console.error('Error refreshing profile:', error);
     } finally {
@@ -79,15 +90,15 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
 
   const handleLogout = () => {
     Alert.alert(
-      'Cerrar Sesión',
-      '¿Estás seguro de que quieres cerrar sesión?',
+      'Sign Out',
+      'Are you sure you want to sign out?',
       [
         {
-          text: 'Cancelar',
+          text: 'Cancel',
           style: 'cancel',
         },
         {
-          text: 'Cerrar Sesión',
+          text: 'Sign Out',
           style: 'destructive',
           onPress: async () => {
             try {
@@ -108,8 +119,8 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
   const handleShare = async () => {
     try {
       await Share.share({
-        message: `Mire profe ${user?.name} me mandó mensaje en whatsapp`,
-        title: 'Compartir perfil',
+        message: `Check out ${user?.name}'s profile on Beer Route!`,
+        title: 'Share Profile',
       });
     } catch (error) {
       console.error('Error sharing:', error);
@@ -118,7 +129,7 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
 
   const formatDate = (dateString: string): string => {
     const date = new Date(dateString);
-    return date.toLocaleDateString('es-ES', {
+    return date.toLocaleDateString('en-US', {
       year: 'numeric',
       month: 'long',
       day: 'numeric',
@@ -126,7 +137,7 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
   };
 
   const getAccountTypeLabel = (accountType: string): string => {
-    return accountType === 'business' ? 'Negocio' : 'Usuario';
+    return accountType === 'business' ? 'Business' : 'User';
   };
 
   const getAccountTypeColor = (accountType: string): string => {
@@ -159,7 +170,7 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
       <SafeAreaView style={styles.loadingContainer}>
         <StatusBar barStyle="light-content" backgroundColor={colors.background} />
         <ActivityIndicator size="large" color={colors.primary} />
-        <Text style={styles.loadingText}>Cargando perfil...</Text>
+        <Text style={styles.loadingText}>Loading profile...</Text>
       </SafeAreaView>
     );
   }
@@ -206,9 +217,6 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
                   color={colors.text} 
                 />
               </View>
-              <TouchableOpacity style={styles.editAvatarButton}>
-                <Icon name="camera-alt" size={16} color={colors.text} />
-              </TouchableOpacity>
             </View>
             
             <Text style={styles.name}>{user.name}</Text>
@@ -232,31 +240,31 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
           <View style={styles.statCard}>
             <Icon name="event" size={24} color={colors.primary} />
             <Text style={styles.statValue}>{calculateMembershipDays(user.createdAt)}</Text>
-            <Text style={styles.statLabel}>Días como miembro</Text>
+            <Text style={styles.statLabel}>Days as member</Text>
           </View>
           
           <View style={styles.statCard}>
             <Icon name="cake" size={24} color={colors.accent} />
             <Text style={styles.statValue}>{calculateAge(user.birthDate)}</Text>
-            <Text style={styles.statLabel}>Años de edad</Text>
+            <Text style={styles.statLabel}>Years old</Text>
           </View>
           
           <View style={styles.statCard}>
-            <Icon name="star" size={24} color={colors.warning} />
-            <Text style={styles.statValue}>4.8</Text>
-            <Text style={styles.statLabel}>Calificación</Text>
+            <Icon name="rate_review" size={24} color={colors.warning} />
+            <Text style={styles.statValue}>{reviewCount}</Text>
+            <Text style={styles.statLabel}>Reviews written</Text>
           </View>
         </View>
 
         {/* Personal Information */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Información Personal</Text>
+          <Text style={styles.sectionTitle}>Personal Information</Text>
           
           <View style={styles.infoCard}>
             <View style={styles.infoItem}>
               <View style={styles.infoItemLeft}>
                 <Icon name="person" size={20} color={colors.primary} />
-                <Text style={styles.infoLabel}>Nombre completo</Text>
+                <Text style={styles.infoLabel}>Full name</Text>
               </View>
               <Text style={styles.infoValue}>{user.name}</Text>
             </View>
@@ -264,7 +272,7 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
             <View style={styles.infoItem}>
               <View style={styles.infoItemLeft}>
                 <Icon name="email" size={20} color={colors.secondary} />
-                <Text style={styles.infoLabel}>Correo electrónico</Text>
+                <Text style={styles.infoLabel}>Email address</Text>
               </View>
               <Text style={styles.infoValue}>{user.email}</Text>
             </View>
@@ -272,15 +280,15 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
             <View style={styles.infoItem}>
               <View style={styles.infoItemLeft}>
                 <Icon name="phone" size={20} color={colors.success} />
-                <Text style={styles.infoLabel}>Teléfono</Text>
+                <Text style={styles.infoLabel}>Phone</Text>
               </View>
-              <Text style={styles.infoValue}>{user.phone || 'No especificado'}</Text>
+              <Text style={styles.infoValue}>{user.phone || 'Not specified'}</Text>
             </View>
 
             <View style={styles.infoItem}>
               <View style={styles.infoItemLeft}>
                 <Icon name="cake" size={20} color={colors.accent} />
-                <Text style={styles.infoLabel}>Fecha de nacimiento</Text>
+                <Text style={styles.infoLabel}>Date of birth</Text>
               </View>
               <Text style={styles.infoValue}>{formatDate(user.birthDate)}</Text>
             </View>
@@ -288,42 +296,49 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
             <View style={styles.infoItem}>
               <View style={styles.infoItemLeft}>
                 <Icon name="schedule" size={20} color={colors.textMuted} />
-                <Text style={styles.infoLabel}>Miembro desde</Text>
+                <Text style={styles.infoLabel}>Member since</Text>
               </View>
               <Text style={styles.infoValue}>{formatDate(user.createdAt)}</Text>
             </View>
           </View>
         </View>
 
-        {/* Quick Actions */}
+        {/* Quick Actions - Mejorado */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Acciones Rápidas</Text>
+          <Text style={styles.sectionTitle}>Quick Actions</Text>
           
-          <View style={styles.quickActionsGrid}>
+          <View style={styles.quickActionsContainer}>
             <TouchableOpacity 
-              style={styles.quickActionCard}
+              style={[styles.quickActionButton, styles.editProfileButton]}
               onPress={() => navigation.navigate('EditProfile')}
             >
-              <Icon name="edit" size={24} color={colors.primary} />
-              <Text style={styles.quickActionText}>Editar Perfil</Text>
+              <View style={styles.quickActionContent}>
+                <View style={styles.quickActionIconContainer}>
+                  <Icon name="edit" size={28} color={colors.primary} />
+                </View>
+                <View style={styles.quickActionTextContainer}>
+                  <Text style={styles.quickActionTitle}>Edit Profile</Text>
+                  <Text style={styles.quickActionSubtitle}>Update your information</Text>
+                </View>
+                <Icon name="chevron_right" size={24} color={colors.textMuted} />
+              </View>
             </TouchableOpacity>
             
             <TouchableOpacity 
-              style={styles.quickActionCard}
+              style={[styles.quickActionButton, styles.favoritesButton]}
               onPress={() => navigation.navigate('Favorites')}
             >
-              <Icon name="favorite" size={24} color={colors.error} />
-              <Text style={styles.quickActionText}>Favoritos</Text>
+              <View style={styles.quickActionContent}>
+                <View style={styles.quickActionIconContainer}>
+                  <Icon name="favorite" size={28} color={colors.error} />
+                </View>
+                <View style={styles.quickActionTextContainer}>
+                  <Text style={styles.quickActionTitle}>Favorites</Text>
+                  <Text style={styles.quickActionSubtitle}>View saved bars</Text>
+                </View>
+                <Icon name="chevron_right" size={24} color={colors.textMuted} />
+              </View>
             </TouchableOpacity>
-
-            <TouchableOpacity 
-              style={styles.quickActionCard}
-              onPress={() => navigation.navigate('BusinessBars')}
-            >
-              <Icon name="business" size={24} color={colors.error} />
-              <Text style={styles.quickActionText}> Gestionar negocios </Text>
-            </TouchableOpacity>
-
           </View>
         </View>
 
@@ -339,7 +354,7 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
             ) : (
               <>
                 <Icon name="logout" size={20} color={colors.text} />
-                <Text style={styles.logoutButtonText}>Cerrar Sesión</Text>
+                <Text style={styles.logoutButtonText}>Sign Out</Text>
               </>
             )}
           </TouchableOpacity>
@@ -415,19 +430,6 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 3,
-    borderColor: colors.surface,
-  },
-  editAvatarButton: {
-    position: 'absolute',
-    bottom: 8,
-    left: 8,
-    backgroundColor: colors.primary,
-    borderRadius: 16,
-    width: 32,
-    height: 32,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 3,
@@ -531,50 +533,55 @@ const styles = StyleSheet.create({
     textAlign: 'right',
     flex: 1,
   },
-  quickActionsGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
+  // Nuevos estilos para Quick Actions mejorados
+  quickActionsContainer: {
     gap: 12,
   },
-  quickActionCard: {
+  quickActionButton: {
     backgroundColor: colors.surface,
-    borderRadius: 12,
-    padding: 16,
-    alignItems: 'center',
+    borderRadius: 16,
+    padding: 20,
     borderWidth: 1,
     borderColor: colors.border,
-    width: (width - 64) / 2,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
   },
-  quickActionText: {
-    fontSize: 14,
-    color: colors.textSecondary,
-    marginTop: 8,
-    fontWeight: '500',
+  editProfileButton: {
+    borderLeftWidth: 4,
+    borderLeftColor: colors.primary,
   },
-  preferencesCard: {
-    backgroundColor: colors.surface,
+  favoritesButton: {
+    borderLeftWidth: 4,
+    borderLeftColor: colors.error,
+  },
+  quickActionContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  quickActionIconContainer: {
+    backgroundColor: colors.surfaceVariant,
     borderRadius: 12,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: colors.border,
+    padding: 12,
+    marginRight: 16,
   },
-  preferenceItem: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-  },
-  preferenceLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  quickActionTextContainer: {
     flex: 1,
   },
-  preferenceLabel: {
-    fontSize: 16,
+  quickActionTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: colors.text,
+    marginBottom: 4,
+  },
+  quickActionSubtitle: {
+    fontSize: 14,
     color: colors.textSecondary,
-    marginLeft: 12,
   },
   logoutContainer: {
     paddingHorizontal: 20,

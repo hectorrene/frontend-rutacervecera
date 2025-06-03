@@ -7,6 +7,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import { BarsStackParamList } from '../../../navigation/userNavigation';
 import BarService from '../../../services/BarService';
+import ReviewModal from './ReviewModal';
 const { width, height } = Dimensions.get('window');
 const isTablet = width >= 768;
 const isDesktop = width >= 1024;
@@ -100,13 +101,37 @@ const BarDetailsScreen: React.FC<BarDetailsScreenProps> = ({ route, navigation }
   const [refreshing, setRefreshing] = useState(false);
   const [isFavorite, setIsFavorite] = useState(false);
   const [activeTab, setActiveTab] = useState<'menu' | 'events' | 'reviews'>('menu');
+  const [showReviewModal, setShowReviewModal] = useState(false);
+  const [userReview, setUserReview] = useState<any>(null);
+  const [hasUserReviewed, setHasUserReviewed] = useState(false);
 
+  // Función para verificar review del usuario
+  const checkUserReview = async () => {
+    try {
+      const result = await BarService.checkUserReview(barId);
+      setHasUserReviewed(result.hasReviewed);
+      setUserReview(result.review || null);
+    } catch (error) {
+      console.error('Error checking user review:', error);
+      setHasUserReviewed(false);
+      setUserReview(null);
+    }
+  };
 
-  
+  // Manejadores de reviews
+  const handleReviewPress = () => {
+    setShowReviewModal(true);
+  };
+
+  const handleReviewSubmitted = () => {
+    fetchBarData();
+  };
+
   const fetchBarData = async () => {
     try {
       const barResponse = await BarService.getBarById(barId);
       setBar(barResponse.data);
+      await checkUserReview();
 
       try {
         const foodResponse = await BarService.getFoodByBarId(barId);
@@ -138,6 +163,14 @@ const BarDetailsScreen: React.FC<BarDetailsScreenProps> = ({ route, navigation }
       } catch (eventsError) {
         console.error('Error fetching events:', eventsError);
         setEvents([]);
+      }
+
+      try {
+        const isFav = await BarService.isBarFavorite(barId);
+        setIsFavorite(isFav);
+      } catch (favError) {
+        console.error('Error checking favorite status:', favError);
+        setIsFavorite(false);
       }
 
     } catch (error) {
@@ -219,133 +252,170 @@ const BarDetailsScreen: React.FC<BarDetailsScreenProps> = ({ route, navigation }
     });
   };
 
-  const renderTabContent = () => {
-    switch (activeTab) {
-      case 'menu':
-        return (
-          <View style={styles.tabContent}>
-            {menu.length === 0 ? (
-              <View style={styles.emptyState}>
-                <Icon name="restaurant-menu" size={48} color={colors.textMuted} />
-                <Text style={styles.emptyStateText}>No menu items available</Text>
-                <Text style={styles.emptyStateSubtext}>Check back later for updates</Text>
-              </View>
-            ) : (
-              <View style={styles.menuGrid}>
-                {menu.map((item) => (
-                  <TouchableOpacity 
-                    key={item._id} 
-                    style={styles.menuCard}
-                    onPress={() => handleMenuItemPress(item)}
-                    activeOpacity={0.8}
-                  >
-                    <View style={styles.menuCardHeader}>
-                      <View style={styles.menuItemInfo}>
-                        <Text style={styles.menuItemName} numberOfLines={1}>{item.name}</Text>
-                        <Text style={styles.menuItemPrice}>${item.price.toFixed(2)}</Text>
-                      </View>
-                      <View style={[styles.categoryBadge, { backgroundColor: getCategoryColor(item.category) }]}>
-                        <Icon name={getCategoryIcon(item.category)} size={16} color={colors.text} />
-                      </View>
+const renderTabContent = () => {
+  switch (activeTab) {
+    case 'menu':
+      return (
+        <View style={styles.tabContent}>
+          {menu.length === 0 ? (
+            <View style={styles.emptyState}>
+              <Icon name="restaurant-menu" size={48} color={colors.textMuted} />
+              <Text style={styles.emptyStateText}>No menu items available</Text>
+              <Text style={styles.emptyStateSubtext}>Check back later for updates</Text>
+            </View>
+          ) : (
+            <View style={styles.menuGrid}>
+              {menu.map((item) => (
+                <TouchableOpacity 
+                  key={item._id} 
+                  style={styles.menuCard}
+                  onPress={() => handleMenuItemPress(item)}
+                  activeOpacity={0.8}
+                >
+                  <View style={styles.menuCardHeader}>
+                    <View style={styles.menuItemInfo}>
+                      <Text style={styles.menuItemName} numberOfLines={1}>{item.name}</Text>
+                      <Text style={styles.menuItemPrice}>${item.price.toFixed(2)}</Text>
                     </View>
-                    {item.description && (
-                      <Text style={styles.menuItemDescription} numberOfLines={2}>
-                        {item.description}
-                      </Text>
-                    )}
-                    {item.isAlcoholic && (
-                      <View style={styles.alcoholBadge}>
-                        <Text style={styles.alcoholBadgeText}>21+</Text>
-                      </View>
-                    )}
-                  </TouchableOpacity>
-                ))}
-              </View>
-            )}
-          </View>
-        );
-
-      case 'events':
-        return (
-          <View style={styles.tabContent}>
-            {events.length === 0 ? (
-              <View style={styles.emptyState}>
-                <Icon name="event" size={48} color={colors.textMuted} />
-                <Text style={styles.emptyStateText}>No upcoming events</Text>
-                <Text style={styles.emptyStateSubtext}>Stay tuned for exciting events</Text>
-              </View>
-            ) : (
-              events.map((event) => (
-                <View key={event._id} style={styles.eventCard}>
-                  <View style={styles.eventHeader}>
-                    <View style={styles.eventDateBadge}>
-                      <Text style={styles.eventDateText}>{formatDate(event.date)}</Text>
-                      {event.time && (
-                        <Text style={styles.eventTimeText}>{event.time}</Text>
-                      )}
+                    <View style={[styles.categoryBadge, { backgroundColor: getCategoryColor(item.category) }]}>
+                      <Icon name={getCategoryIcon(item.category)} size={16} color={colors.text} />
                     </View>
-                    <Icon name="event" size={24} color={colors.primary} />
                   </View>
-                  <Text style={styles.eventTitle}>{event.title}</Text>
-                  <Text style={styles.eventDescription}>{event.description}</Text>
-                </View>
-              ))
-            )}
-          </View>
-        );
-
-      case 'reviews':
-        return (
-          <View style={styles.tabContent}>
-            {reviews.length === 0 ? (
-              <View style={styles.emptyState}>
-                <Icon name="rate-review" size={48} color={colors.textMuted} />
-                <Text style={styles.emptyStateText}>No reviews yet</Text>
-                <Text style={styles.emptyStateSubtext}>Be the first to leave a review</Text>
-              </View>
-            ) : (
-              <>
-                {reviews.slice(0, 5).map((review) => (
-                  <View key={review._id} style={styles.reviewCard}>
-                    <View style={styles.reviewHeader}>
-                      <View style={styles.reviewUserInfo}>
-                        <View style={styles.userAvatar}>
-                          <Text style={styles.userInitial}>
-                            {review.user.name.charAt(0).toUpperCase()}
-                          </Text>
-                        </View>
-                        <View>
-                          <Text style={styles.reviewUser}>{review.user.name}</Text>
-                          <Text style={styles.reviewDate}>
-                            {formatDate(review.createdAt)}
-                          </Text>
-                        </View>
-                      </View>
-                      <View style={styles.reviewRating}>
-                        {renderStars(review.rating, 14)}
-                      </View>
-                    </View>
-                    <Text style={styles.reviewComment}>{review.comment}</Text>
-                  </View>
-                ))}
-                {reviews.length > 5 && (
-                  <TouchableOpacity style={styles.moreReviewsButton}>
-                    <Text style={styles.moreReviewsText}>
-                      View all {reviews.length} reviews
+                  {item.description && (
+                    <Text style={styles.menuItemDescription} numberOfLines={2}>
+                      {item.description}
                     </Text>
-                    <Icon name="arrow-forward" size={16} color={colors.primary} />
-                  </TouchableOpacity>
-                )}
-              </>
-            )}
-          </View>
-        );
+                  )}
+                  {item.isAlcoholic && (
+                    <View style={styles.alcoholBadge}>
+                      <Text style={styles.alcoholBadgeText}>21+</Text>
+                    </View>
+                  )}
+                </TouchableOpacity>
+              ))}
+            </View>
+          )}
+        </View>
+      );
 
-      default:
-        return null;
-    }
-  };
+    case 'events':
+      return (
+        <View style={styles.tabContent}>
+          {events.length === 0 ? (
+            <View style={styles.emptyState}>
+              <Icon name="event" size={48} color={colors.textMuted} />
+              <Text style={styles.emptyStateText}>No upcoming events</Text>
+              <Text style={styles.emptyStateSubtext}>Stay tuned for exciting events</Text>
+            </View>
+          ) : (
+            events.map((event) => (
+              <View key={event._id} style={styles.eventCard}>
+                <View style={styles.eventHeader}>
+                  <View style={styles.eventDateBadge}>
+                    <Text style={styles.eventDateText}>{formatDate(event.date)}</Text>
+                    {event.time && (
+                      <Text style={styles.eventTimeText}>{event.time}</Text>
+                    )}
+                  </View>
+                  <Icon name="event" size={24} color={colors.primary} />
+                </View>
+                <Text style={styles.eventTitle}>{event.title}</Text>
+                <Text style={styles.eventDescription}>{event.description}</Text>
+              </View>
+            ))
+          )}
+        </View>
+      );
 
+case 'reviews':
+  return (
+    <View style={styles.tabContent}>
+      {/* Botón para escribir/editar review */}
+      <View style={styles.reviewHeader}>
+        <TouchableOpacity
+          style={[
+            styles.writeReviewButton,
+            hasUserReviewed && styles.editReviewButton
+          ]}
+          onPress={handleReviewPress}
+        >
+          <Icon 
+            name={hasUserReviewed ? "edit" : "rate-review"} 
+            size={20} 
+            color={colors.text} 
+          />
+          <Text style={styles.writeReviewButtonText}>
+            {hasUserReviewed ? "Edit Your Review" : "Write a Review"}
+          </Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* Lista de reviews */}
+      {reviews.length === 0 ? (
+        <View style={styles.emptyState}>
+          <Icon name="rate-review" size={48} color={colors.textMuted} />
+          <Text style={styles.emptyStateText}>No reviews yet</Text>
+          <Text style={styles.emptyStateSubtext}>
+            Be the first to share your experience
+          </Text>
+        </View>
+      ) : (
+        <>
+          {reviews.slice(0, 5).map((review) => (
+            <View key={review._id} style={styles.reviewCard}>
+              <View style={styles.reviewHeader}>
+                <View style={styles.reviewUserInfo}>
+                  <View style={styles.userAvatar}>
+                    <Text style={styles.userInitial}>
+                      {review.user.name.charAt(0).toUpperCase()}
+                    </Text>
+                  </View>
+                  <View>
+                    <Text style={styles.reviewUser}>{review.user.name}</Text>
+                    <Text style={styles.reviewDate}>
+                      {new Date(review.createdAt).toLocaleDateString('en-US', {
+                        year: 'numeric',
+                        month: 'short',
+                        day: 'numeric'
+                      })}
+                    </Text>
+                  </View>
+                </View>
+                <View style={styles.reviewRating}>
+                  {renderStars(review.rating, 14)}
+                </View>
+              </View>
+              <Text style={styles.reviewComment}>{review.comment}</Text>
+            </View>
+          ))}
+          
+          {/* Mostrar botón "Ver más" si hay más de 5 reviews */}
+          {reviews.length > 5 && (
+            <TouchableOpacity style={styles.moreReviewsButton}>
+              <Text style={styles.moreReviewsText}>
+                View all {reviews.length} reviews
+              </Text>
+              <Icon name="arrow-forward" size={16} color={colors.primary} />
+            </TouchableOpacity>
+          )}
+        </>
+      )}
+
+      {/* Modal de Review */}
+      <ReviewModal
+        visible={showReviewModal}
+        onClose={() => setShowReviewModal(false)}
+        onReviewSubmitted={handleReviewSubmitted}
+        barId={barId}
+        barName={bar?.name || ''}
+        existingReview={userReview}
+      />
+    </View>
+  );
+    default:
+      return null;
+  }
+}
   const getCategoryColor = (category: string) => {
     switch (category) {
       case 'food': return colors.success;
@@ -445,9 +515,6 @@ const BarDetailsScreen: React.FC<BarDetailsScreenProps> = ({ route, navigation }
             <View style={styles.headerActions}>
               <TouchableOpacity style={styles.actionButton} onPress={handleAddToFavorites}>
                 <Icon name={isFavorite ? 'favorite' : 'favorite-border'} size={24} color={colors.text} />
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.actionButton}>
-                <Icon name="share" size={24} color={colors.text} />
               </TouchableOpacity>
             </View>
           </View>
@@ -708,6 +775,27 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     borderWidth: 1,
     borderColor: colors.borderLight,
+  },
+  reviewHeaderSection: {
+  marginBottom: 20,
+},
+writeReviewButton: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  justifyContent: 'center',
+  backgroundColor: colors.primary,
+  paddingVertical: 14,
+  paddingHorizontal: 20,
+  borderRadius: 12,
+  gap: 8,
+},
+  editReviewButton: {
+    backgroundColor: colors.secondary,
+  },
+  writeReviewButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: colors.text,
   },
   tagText: {
     fontSize: 12,

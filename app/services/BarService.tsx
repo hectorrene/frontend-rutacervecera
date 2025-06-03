@@ -2,8 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios, { AxiosResponse } from 'axios';
 import { Platform } from 'react-native';
 import { HandleLoginError } from "../../helpers/ErrorHandler";
-import AuthService from './AuthService';
-
+import { authService } from './AuthService'; // Cambiar a la instancia, no la clase
 
 const API_BASE_URL = Platform.select({
   ios: 'http://192.168.100.191:3000/api',
@@ -27,6 +26,19 @@ class BarService {
       },
       (error) => Promise.reject(error)
     );
+  }
+
+  // Obtener el conteo de reviews de un usuario
+  async getUserReviewCount(userId?: string): Promise<AxiosResponse> {
+    try {
+      const targetUserId = userId || authService.getCurrentUser()?._id;
+      if (!targetUserId) throw new Error('User not authenticated');
+      
+      return await this.api.get(`/users/${targetUserId}/reviews/count`);
+    } catch (error) {
+      HandleLoginError(error);
+      throw error;
+    }
   }
 
   // Jala todos los bares
@@ -122,6 +134,80 @@ class BarService {
     }
   }
 
+  // Crear una review para un bar
+async createReview(barId: string, reviewData: {
+  rating: number;
+  comment: string;
+  photos?: string[];
+}): Promise<AxiosResponse> {
+  try {
+    return await this.api.post(`/bars/${barId}/reviews`, reviewData);
+  } catch (error) {
+    HandleLoginError(error);
+    throw error;
+  }
+}
+
+// Actualizar una review
+async updateReview(reviewId: string, reviewData: {
+  rating?: number;
+  comment?: string;
+  photos?: string[];
+}): Promise<AxiosResponse> {
+  try {
+    return await this.api.put(`/reviews/${reviewId}`, reviewData);
+  } catch (error) {
+    HandleLoginError(error);
+    throw error;
+  }
+}
+
+// Eliminar una review
+async deleteReview(reviewId: string): Promise<AxiosResponse> {
+  try {
+    return await this.api.delete(`/reviews/${reviewId}`);
+  } catch (error) {
+    HandleLoginError(error);
+    throw error;
+  }
+}
+
+// Verificar si el usuario ya hizo una review para un bar
+async checkUserReview(barId: string): Promise<{hasReviewed: boolean, review?: any}> {
+  const userId = authService.getCurrentUser()?._id;
+  if (!userId) return { hasReviewed: false };
+  
+  try {
+    const response = await this.api.get(`/users/${userId}/reviews/${barId}/check`);
+    return response.data;
+  } catch (error) {
+    return { hasReviewed: false };
+  }
+}
+
+// Obtener estadísticas de reviews de un bar
+async getBarReviewStats(barId: string): Promise<AxiosResponse> {
+  try {
+    return await this.api.get(`/bars/${barId}/reviews/stats`);
+  } catch (error) {
+    HandleLoginError(error);
+    throw error;
+  }
+}
+
+// Obtener reviews de un usuario
+async getUserReviews(userId?: string): Promise<AxiosResponse> {
+  try {
+    const targetUserId = userId || authService.getCurrentUser()?._id;
+    if (!targetUserId) throw new Error('User not authenticated');
+    
+    return await this.api.get(`/users/${targetUserId}/reviews`);
+  } catch (error) {
+    HandleLoginError(error);
+    throw error;
+  }
+}
+
   // jala todos los eventos 
   async getAllEvents(): Promise<AxiosResponse> {
     try {
@@ -164,7 +250,7 @@ class BarService {
 
   // Agregar a favoritos
   async addBarToFavorites(barId: string): Promise<AxiosResponse> {
-    const userId = AuthService.getCurrentUser()?._id;
+    const userId = authService.getCurrentUser()?._id; // Usar la instancia authService
     if (!userId) throw new Error('User not authenticated');
     
     try {
@@ -180,7 +266,7 @@ class BarService {
 
   // eliminar de favoritos
   async removeBarFromFavorites(barId: string): Promise<AxiosResponse> {
-    const userId = AuthService.getCurrentUser()?._id;
+    const userId = authService.getCurrentUser()?._id; // Usar la instancia authService
     if (!userId) throw new Error('User not authenticated');
     
     return await this.api.delete(`/users/${userId}/favorites/${barId}`);
@@ -188,7 +274,7 @@ class BarService {
 
   // verificar si un bar es favorito
   async isBarFavorite(barId: string): Promise<boolean> {
-    const userId = AuthService.getCurrentUser()?._id;
+    const userId = authService.getCurrentUser()?._id; // Usar la instancia authService
     if (!userId) return false;
     
     try {
@@ -211,4 +297,3 @@ class BarService {
 }
 
 export default new BarService();
-

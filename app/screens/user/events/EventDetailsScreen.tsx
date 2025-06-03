@@ -2,19 +2,19 @@ import { RouteProp } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import React, { useEffect, useState } from 'react';
 import {
-    ActivityIndicator,
-    Dimensions,
-    Image,
-    Linking,
-    Platform,
-    RefreshControl,
-    ScrollView,
-    Share,
-    StatusBar,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View
+  ActivityIndicator,
+  Dimensions,
+  Image,
+  Linking,
+  Platform,
+  RefreshControl,
+  ScrollView,
+  Share,
+  StatusBar,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/MaterialIcons';
@@ -135,11 +135,11 @@ const EventDetailsScreen: React.FC<EventDetailsScreenProps> = ({ route, navigati
     
     try {
       await Share.share({
-        message: `¡Mira este evento! ${event.name} en ${event.bar?.name}. ${event.description}`,
+        message: `¡Mira este evento! ${event.name} en ${event.bar?.name}. ${event.description}. Es en ${event.location} el ${formatDate(event.start)} a las ${formatTime(event.start)}.`,
         title: event.name,
       });
     } catch (error) {
-      console.error('Error sharing:', error);
+      console.error('Error sharing:', error); 
     }
   };
 
@@ -268,7 +268,7 @@ const EventDetailsScreen: React.FC<EventDetailsScreenProps> = ({ route, navigati
             <View style={styles.detailCard}>
               <View style={styles.detailHeader}>
                 <Icon name="event" size={24} color={colors.primary} />
-                <Text style={styles.detailTitle}>Fecha y Hora</Text>
+                <Text style={styles.detailTitle}> Date and time </Text>
               </View>
               <Text style={styles.detailText}>
                 {formatDate(event.start)}
@@ -285,18 +285,17 @@ const EventDetailsScreen: React.FC<EventDetailsScreenProps> = ({ route, navigati
             >
               <View style={styles.detailHeader}>
                 <Icon name="location-on" size={24} color={colors.accent} />
-                <Text style={styles.detailTitle}>Ubicación</Text>
+                <Text style={styles.detailTitle}> Location </Text>
                 <Icon name="open-in-new" size={16} color={colors.textMuted} />
               </View>
               <Text style={styles.detailText}>{event.location}</Text>
-              <Text style={styles.detailSubtext}>Toca para abrir en mapas</Text>
             </TouchableOpacity>
 
             {/* Price Card */}
             <View style={styles.detailCard}>
               <View style={styles.detailHeader}>
                 <Icon name="attach-money" size={24} color={colors.success} />
-                <Text style={styles.detailTitle}>Precio</Text>
+                <Text style={styles.detailTitle}>Price</Text>
               </View>
               <Text style={styles.detailText}>
                 {event.price > 0 ? `$${event.price.toFixed(2)}` : 'Entrada gratuita'}
@@ -313,31 +312,6 @@ const EventDetailsScreen: React.FC<EventDetailsScreenProps> = ({ route, navigati
             <Text style={styles.description}>{event.description}</Text>
           </View>
 
-          {/* Action Buttons */}
-          <View style={styles.actionButtonsContainer}>
-            <TouchableOpacity style={styles.primaryButton}>
-              <Icon name="event-available" size={20} color={colors.text} />
-              <Text style={styles.primaryButtonText}>Asistir al evento</Text>
-            </TouchableOpacity>
-            
-            <View style={styles.secondaryButtons}>
-              <TouchableOpacity 
-                style={styles.secondaryButton}
-                onPress={handleOpenMaps}
-              >
-                <Icon name="directions" size={20} color={colors.primary} />
-                <Text style={styles.secondaryButtonText}>Direcciones</Text>
-              </TouchableOpacity>
-              
-              <TouchableOpacity 
-                style={styles.secondaryButton}
-                onPress={handleShare}
-              >
-                <Icon name="share" size={20} color={colors.primary} />
-                <Text style={styles.secondaryButtonText}>Compartir</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
         </View>
       </ScrollView>
     </SafeAreaView>
