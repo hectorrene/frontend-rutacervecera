@@ -4,9 +4,8 @@ import { createStackNavigator } from '@react-navigation/stack';
 import React from 'react';
 import { ActivityIndicator, Dimensions, Platform, StyleSheet, Text, View } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialIcons';
+import BusinessProtectedRoute from '../components/BusinessProtectedRoute';
 import { useAuth } from '../context/AuthContext';
-
-// ✅ IMPORTS CORREGIDOS - Importar desde las carpetas correctas
 import BusinessDetails from '../screens/business/bar/BarDetailScreen';
 import BusinessBars from '../screens/business/bar/BarListScreen';
 import CreateBarScreen from '../screens/business/bar/CreateBarScreen';
@@ -247,56 +246,59 @@ function ProfileStack() {
 const BusinessStack = createStackNavigator<BusinessStackParamList>();
 function BusinessNavigator() {
   return (
-  <BusinessStack.Navigator
-      screenOptions={{
-        headerShown: false,
-      }}>
+    <BusinessProtectedRoute>
+      <BusinessStack.Navigator
+        screenOptions={{
+          headerShown: false,
+        }}>
 
-      <BusinessStack.Screen
-        name="BarListScreen"
-        component={BusinessBars}
-      />
+        <BusinessStack.Screen
+          name="BarListScreen"
+          component={BusinessBars}
+        />
 
-      <BusinessStack.Screen
-        name="BusinessDetails"
-        component={BusinessDetails}
-      />
+        <BusinessStack.Screen
+          name="BusinessDetails"
+          component={BusinessDetails}
+        />
 
-      <BusinessStack.Screen
-        name="CreateBarScreen"
-        component={CreateBarScreen}
-        options={{
-          title: 'Crear Nuevo Bar',
-        }}
-      />
+        <BusinessStack.Screen
+          name="CreateBarScreen"
+          component={CreateBarScreen}
+          options={{
+            title: 'Crear Nuevo Bar',
+          }}
+        />
 
-      <BusinessStack.Screen
-        name = "EditBarScreen"
-        component = {EditBarScreen}
-      />
+        <BusinessStack.Screen
+          name = "EditBarScreen"
+          component = {EditBarScreen}
+        />
 
-      <BusinessStack.Screen
-        name="MenuListScreen"
-        component={AddMenuItemScreen}
-      />
+        <BusinessStack.Screen
+          name="MenuListScreen"
+          component={AddMenuItemScreen}
+        />
 
-      <BusinessStack.Screen
-        name = "AddEventScreen"
-        component = {AddEventScreen}
-      />
+        <BusinessStack.Screen
+          name = "AddEventScreen"
+          component = {AddEventScreen}
+        />
 
-      <BusinessStack.Screen
-        name = "EditEventScreen"
-        component = {EditEventScreen}
-      />
+        <BusinessStack.Screen
+          name = "EditEventScreen"
+          component = {EditEventScreen}
+        />
 
-      <BusinessStack.Screen
-        name="EditMenuItemScreen"
-        component={EditMenuItemScreen}
-      />
-  </BusinessStack.Navigator>
+        <BusinessStack.Screen
+          name="EditMenuItemScreen"
+          component={EditMenuItemScreen}
+        />
+      </BusinessStack.Navigator>
+    </BusinessProtectedRoute>
   );
 }
+
 
 // Tab configuration for both mobile and desktop
 const tabScreens = [
