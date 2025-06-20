@@ -1,7 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // Configuración base de la API
-const API_BASE_URL = 'http://192.168.100.191:3000/api'; // ✅ CORREGIDO - URL actualizada
+const API_BASE_URL = 'http://44.202.149.213:3000/api';
 const TOKEN_KEY = 'auth_token';
 
 interface ApiResponse<T = any> {
