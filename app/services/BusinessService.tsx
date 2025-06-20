@@ -5,9 +5,9 @@ import { HandleLoginError } from "../../helpers/ErrorHandler";
 import { getCurrentUserGlobal } from '../context/AuthContext'; // Importar la función global
 
 const API_BASE_URL = Platform.select({
-  ios: 'http://192.168.100.191:3000/api',
+  ios: 'http://44.202.149.213:3000/api',
   android: 'http://10.0.2.2:3000/api',
-  default: 'http://192.168.100.191:3000/api'
+  default: 'http://44.202.149.213:3000/api'
 });
 
 class BusinessService {
